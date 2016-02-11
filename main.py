@@ -12,11 +12,14 @@ pattern3 = np.where(t<0.5, 2*t, 2-2*t)
 pattern4 = -pattern3
 
 def make_pattern():
-    return nengo.processes.sample(1000, nengo.processes.WhiteNoise(T, high=2), dt=dt, d=T)
+    sig = nengo.processes.WhiteSignal(T, high=2)
+    # this is returning a flat signal and I don't know why
+    return sig.run(1000)
 
 np.random.seed(3)
-patterns = [make_pattern()[:,0] for i in range(4)]
-patterns = [pattern1,pattern2, pattern3, pattern4]
+#patterns = [make_pattern()[:,0] for i in range(4)]
+patterns = [pattern1, pattern2, pattern3, pattern4]
+# maps from input value (in this case, theta) to output value
 patterns = np.array(patterns)
 
 model = nengo.Network()
@@ -28,6 +31,7 @@ with model:
     system = nengo.Ensemble(n_neurons=1000, dimensions=3, radius=1.4, label='cycle')
 
     def cycle(x):
+        """makes a speed controlled oscillator"""
         a = 1
         b = 2 * np.pi * x[2]
         r = np.sqrt(x[0]**2 + x[1]**2)
@@ -40,7 +44,7 @@ with model:
 
         return [x[0] + tau*dx, x[1] + tau*dy]
 
-    nengo.Connection(system, system[:2], synapse=tau, function=cycle)  
+    nengo.Connection(system, system[:2], synapse=tau, function=cycle)
 
     rate = nengo.Node([1])
     nengo.Connection(rate, system[2])
@@ -48,6 +52,7 @@ with model:
     readouts = nengo.networks.EnsembleArray(n_neurons=30, n_ensembles=len(patterns))
     for i in range(len(patterns)):
         def read_func(x, index=i):
+            """based off angle, read out pattern"""
             theta_p = np.arctan2(x[1], x[0])
             r_p = np.sqrt(x[0]**2 + x[1]**2)
             if theta_p < 0: 

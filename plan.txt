@@ -1,0 +1,6 @@
+We need to find a way to make it so that when switching between patterns,
+they sync up nicely. Consequently, we have to:
+- Read about inverse DMPs
+- Read about how Conceptors do the syncing up nicely stuff
+	a) via the technical reports
+	b) via the matlab code

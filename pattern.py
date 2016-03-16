@@ -1,6 +1,5 @@
 import scipy.io
 from scipy import interpolate
-from sklearn.preprocessing import scale
 import nengo
 import numpy as np
 
@@ -46,14 +45,15 @@ output_dims = 61
 pattern_num = 2
 pattern_file_names = pattern_file_names[:2]
 
-function_list = []
 min_maxs = np.zeros((output_dims, 2))
 raw_dats = []
 
 # get the actual maximum and minimums for each dimension
 for nm in pattern_file_names:
-    raw_dats.append(scipy.io.loadmat("section2.3_demoMotionCapture/nnData/%s.mat" %(nm))[nm])
+    name = nm[5:]
+    raw_dats.append(scipy.io.loadmat("section2.3_demoMotionCapture/nnData/%s.mat" %(nm))["nnRawData"+name].T)
     for o_i in range(output_dims):
+        assert raw_dats[-1][o_i].shape != (61,)
         min_val = np.min(raw_dats[-1][o_i])
         if min_val < min_maxs[o_i, 0]:
             min_maxs[o_i, 0] = min_val
@@ -62,20 +62,24 @@ for nm in pattern_file_names:
         if max_val > min_maxs[o_i, 1]:
             min_maxs[o_i, 1] = max_val
 
+function_list = []
+
 for n_i, nm in enumerate(pattern_file_names):
     # make each pattern values normalised between -1, 1
-    # and temporally squash them between pi/2 and -pi/2
+    # and temporally squash them between -1 and 1 too
     function_list.append([])
     raw_dat = raw_dats[n_i]
-    xv = np.linspace(-np.pi/2, np/2, raw_dat.shape[0])
-    assert raw_dat.shape[1] == output_dims
+    xv = np.linspace(-1, 1, raw_dat.shape[1])
+    assert raw_dat.shape[0] == output_dims
     normed_data = np.zeros_like(raw_dat)
 
     for o_i in range(output_dims):
-        normed_data[:, o_i] = d3_scale(raw_dat[:, o_i], in_range=min_maxs[o_i])
-        assert np.max(normed_data) == 1
-        assert np.min(normed_data) == -1
-        function_list[-1].append(interpolate.interp1d(xv, normed_dat[:, o_i]))
+        assert min_maxs[o_i][0] <= np.min(raw_dat[o_i, :]) 
+        assert min_maxs[o_i][1] >= np.max(raw_dat[o_i, :]) 
+        normed_data[o_i, :] = d3_scale(raw_dat[o_i, :], in_range=min_maxs[o_i])
+        assert np.max(normed_data) <= 1.5
+        assert np.min(normed_data) >= -1.5
+        function_list[-1].append(interpolate.interp1d(xv, normed_data[o_i, :]))
 
 
 np.random.seed(3)

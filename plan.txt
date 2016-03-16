@@ -4,3 +4,7 @@ they sync up nicely. Consequently, we have to:
 - Read about how Conceptors do the syncing up nicely stuff
 	a) via the technical reports
 	b) via the matlab code
+
+What's with the awkward bump in arctan2 approximation and how do I get rid of it?
+The reset period of the animation is going to be jerky as hell, do
+rythmic DMPs show me how to do it more smoothly?

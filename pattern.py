@@ -116,11 +116,11 @@ with model:
 
     # what's stopping this from being a passthrough node?
     readout = nengo.Ensemble(n_neurons=1, dimensions=1, neuron_type=nengo.Direct())
-    nengo.Connection(osc[:2], readout,
+    nengo.Connection(osc[:2], readout, synapse=None,
                      function=lambda x: np.arctan2(x[1], x[0]))
 
-    # controllers
-    inhibit_control = nengo.Node([0]*pattern_num)
+    # controllers # TODO: Make smoother transition
+    inhibit_control = nengo.Node(lambda t: [0,1] if t < 2 else [1,0])
     #scale_control = nengo.Node([0]*pattern_num)
 
     output = nengo.networks.EnsembleArray(n_neurons=100, n_ensembles=output_dims,
@@ -157,7 +157,7 @@ with model:
     p_out = nengo.Probe(output.output)
 
 with nengo.Simulator(model) as sim:
-    sim.run(1)
+    sim.run(4)
 
 # un-normalise on export based off the original domain
 tmp = sim.data["p_out"]

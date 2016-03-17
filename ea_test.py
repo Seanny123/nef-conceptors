@@ -72,7 +72,7 @@ with model:
 
     # what's stopping this from being a passthrough node?
     readout = nengo.Ensemble(n_neurons=1, dimensions=1, neuron_type=nengo.Direct())
-    nengo.Connection(osc[:2], readout, synape=None,
+    nengo.Connection(osc[:2], readout, synapse=None,
                      function=lambda x: np.arctan2(x[1], x[0]))
 
     # controllers

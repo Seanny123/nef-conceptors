@@ -1,10 +1,16 @@
-We need to find a way to make it so that when switching between patterns,
-they sync up nicely. Consequently, we have to:
-- Read about inverse DMPs
-- Read about how Conceptors do the syncing up nicely stuff
-	a) via the technical reports
-	b) via the matlab code
+Find out the minimum resolution you can plug the values into the mo-cap generator.
 
 What's with the awkward bump in arctan2 approximation and how do I get rid of it?
+That's just a shitty approximation of the function, switching to direct neurons will solve that problem.
+
 The reset period of the animation is going to be jerky as hell, do
 rythmic DMPs show me how to do it more smoothly?
+If you use direct neurons and put zero filtering on the synapses, the transition will be instantaneous.
+
+What will that mean for biological plausibility?
+Well, our representation of the dynamics will still be biologically plausible, but the manipulation of them certainly won't be. This will just be an indication that approximating dynamics from motion-capture and then directly shoving them into your output probably isn't a great idea.
+
+What if my pattern isn't symmetrical around +pi and -pi?
+Well, then I guess we force it to be symmetrical? Or I guess it doesn't matter since there's only so much change a neuron can do anyways...
+Worst comes to worst it makes the repeat of the action weird.
+If that's the case, try smoothing via elongation of action

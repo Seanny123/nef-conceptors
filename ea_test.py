@@ -2,7 +2,6 @@
 
 import scipy.io
 from scipy import interpolate
-from sklearn.preprocessing import scale
 import nengo
 import numpy as np
 
@@ -47,7 +46,7 @@ tau = 0.1
 model.config[nengo.Ensemble].neuron_type = nengo.LIFRate()
 ea_list = []
 with model:
-    osc = nengo.Ensemble(n_neurons=1500, dimensions=3, radius=1.4)
+    osc = nengo.Ensemble(n_neurons=1, dimensions=3, neuron_type=nengo.Direct())
 
     def cycle(x):
         """makes a speed controlled oscillator"""
@@ -72,8 +71,8 @@ with model:
     nengo.Connection(bump, osc[0])
 
     # what's stopping this from being a passthrough node?
-    readout = nengo.Ensemble(n_neurons=1500, dimensions=1)
-    nengo.Connection(osc[:2], readout,
+    readout = nengo.Ensemble(n_neurons=1, dimensions=1, neuron_type=nengo.Direct())
+    nengo.Connection(osc[:2], readout, synape=None,
                      function=lambda x: np.arctan2(x[1], x[0]))
 
     # controllers

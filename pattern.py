@@ -23,7 +23,7 @@ def d3_scale(dat, out_range=(-1, 1), in_range=None):
     return interp(uninterp(dat))
 
 # load the patterns from matlab
-pattern_file_names = [
+pattern_file_names = (
      "nnRawExaStride",
      "nnRawSlowWalk",
      "nnRawWalk",
@@ -39,7 +39,7 @@ pattern_file_names = [
      "nnRawBox1",
      "nnRawBox2",
      "nnRawBox3",
-]
+)
 
 output_dims = 61
 pattern_num = 2
@@ -66,10 +66,10 @@ function_list = []
 
 for n_i, nm in enumerate(pattern_file_names):
     # make each pattern values normalised between -1, 1
-    # and temporally squash them between -1 and 1 too
+    # and temporally squash them between -pi and pi too
     function_list.append([])
     raw_dat = raw_dats[n_i]
-    xv = np.linspace(-1, 1, raw_dat.shape[1])
+    xv = np.linspace(-np.pi, np.pi, raw_dat.shape[1])
     assert raw_dat.shape[0] == output_dims
     normed_data = np.zeros_like(raw_dat)
 
@@ -90,7 +90,7 @@ tau = 0.1
 model.config[nengo.Ensemble].neuron_type = nengo.Direct()
 ea_list = []
 with model:
-    osc = nengo.Ensemble(n_neurons=1500, dimensions=3, radius=1.4)
+    osc = nengo.Ensemble(n_neurons=1, dimensions=3, neuron_type=nengo.Direct())
 
     def cycle(x):
         """makes a speed controlled oscillator"""
@@ -115,7 +115,7 @@ with model:
     nengo.Connection(bump, osc[0])
 
     # what's stopping this from being a passthrough node?
-    readout = nengo.Ensemble(n_neurons=500, dimensions=1)
+    readout = nengo.Ensemble(n_neurons=1, dimensions=1, neuron_type=nengo.Direct())
     nengo.Connection(osc[:2], readout,
                      function=lambda x: np.arctan2(x[1], x[0]))
 
@@ -123,8 +123,8 @@ with model:
     inhibit_control = nengo.Node([0]*pattern_num)
     #scale_control = nengo.Node([0]*pattern_num)
 
-    output = nengo.EnsembleArray(n_neurons=100, dimensions=output_dims,
-                                 label="output")
+    output = nengo.networks.EnsembleArray(n_neurons=100, n_ensembles=output_dims,
+                                          label="output")
 
     # one ensemble array per output pattern
     # each ensemble array has the output dimensions
@@ -135,21 +135,21 @@ with model:
 
     for n_i, nm in enumerate(pattern_file_names):
         # make the EnsembleArray with the associated functions
-        name = nm[10:]
-        e = nengo.EnsembleArray(n_neurons=100, n_ensembles=output_dims,
-                                label=nm[10:])
-        for dim in range(output_dims):
-            e.add_ouput("out_"+nm[10:], function_list[n_i][dim])
+        name = nm[5:]
+        e = nengo.networks.EnsembleArray(n_neurons=100, n_ensembles=output_dims,
+                                label=name)
+        e.add_output("out_"+name, function_list[n_i])
         e.add_neuron_input()
 
         # make the connections for inhibition (proxy for output of BG)
-        nengo.Connection(inhibit_control[n_i], e.neuron_input)
+        nengo.Connection(inhibit_control[n_i], e.neuron_input,
+                         transform=np.ones((100*output_dims, 1)) * -3)
 
         # TODO: make the connections for scaling (proxy for output of Thal)
 
         # make input and output connections
-        nengo.Connection(readout, e.input)
-        nengo.Connection(e.output, output)
+        nengo.Connection(readout, e.input, transform=np.ones((output_dims, 1)))
+        nengo.Connection(getattr(e, "out_"+name), output.input)
 
         ea_list.append(e)
 
@@ -163,7 +163,8 @@ with nengo.Simulator(model) as sim:
 tmp = sim.data["p_out"]
 reg_out.zeros_like(tmp)
 for t_i in range(tmp.shape[0]):
-    reg_out[t_i, :] = d3_scale(tmp[t_i, :], out_range=min_maxs[o_i])
+    reg_out[t_i, :] = d3_scale(tmp[t_i, :], out_range=min_maxs[o_i],
+                               in_range=(-1, 1))
 
 
 # try running the patterns in Matlab to see if they're legit

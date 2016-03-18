@@ -2,6 +2,7 @@ import scipy.io
 from scipy import interpolate
 import nengo
 import numpy as np
+import ipdb
 
 def d3_scale(dat, out_range=(-1, 1), in_range=None):
     if in_range == None:
@@ -87,7 +88,7 @@ np.random.seed(3)
 
 model = nengo.Network()
 tau = 0.1
-model.config[nengo.Ensemble].neuron_type = nengo.Direct()
+#model.config[nengo.Ensemble].neuron_type = nengo.Direct()
 ea_list = []
 with model:
     osc = nengo.Ensemble(n_neurons=1, dimensions=3, neuron_type=nengo.Direct())
@@ -160,12 +161,12 @@ with nengo.Simulator(model) as sim:
     sim.run(4)
 
 # un-normalise on export based off the original domain
-tmp = sim.data["p_out"]
-reg_out.zeros_like(tmp)
+tmp = sim.data[p_out]
+reg_out = np.zeros_like(tmp)
 for t_i in range(tmp.shape[0]):
     reg_out[t_i, :] = d3_scale(tmp[t_i, :], out_range=min_maxs[o_i],
                                in_range=(-1, 1))
-
+ipdb.set_trace()
 
 # try running the patterns in Matlab to see if they're legit
 scipy.io.savemat("pattern_out.mat", reg_out)

@@ -42,11 +42,14 @@ pattern_file_names = (
      "nnRawBox3",
 )
 
-output_dims = 61
-pattern_num = 2
-pattern_file_names = pattern_file_names[:2]
+# max is 61, but 14 is a nice leg
+output_dims = 1
+pattern_num = 1
+pattern_file_names = pattern_file_names[:pattern_num]
 
 min_maxs = np.zeros((output_dims, 2))
+min_maxs[:, 0] = np.inf
+min_maxs[:, 1] = -np.inf
 raw_dats = []
 
 # get the actual maximum and minimums for each dimension
@@ -63,6 +66,9 @@ for nm in pattern_file_names:
         if max_val > min_maxs[o_i, 1]:
             min_maxs[o_i, 1] = max_val
 
+assert np.all(min_maxs[:, 0] != np.inf)
+assert np.all(min_maxs[:, 1] != -np.inf)
+
 function_list = []
 
 for n_i, nm in enumerate(pattern_file_names):
@@ -71,7 +77,7 @@ for n_i, nm in enumerate(pattern_file_names):
     function_list.append([])
     raw_dat = raw_dats[n_i]
     xv = np.linspace(-np.pi, np.pi, raw_dat.shape[1])
-    assert raw_dat.shape[0] == output_dims
+    #assert raw_dat.shape[0] == output_dims
     normed_data = np.zeros_like(raw_dat)
 
     for o_i in range(output_dims):
@@ -116,16 +122,17 @@ with model:
     nengo.Connection(bump, osc[0])
 
     # what's stopping this from being a passthrough node?
-    readout = nengo.Ensemble(n_neurons=1, dimensions=1, neuron_type=nengo.Direct())
+    readout = nengo.Ensemble(n_neurons=1, dimensions=1, radius=np.pi, neuron_type=nengo.Direct())
     nengo.Connection(osc[:2], readout, synapse=None,
                      function=lambda x: np.arctan2(x[1], x[0]))
 
     # controllers # TODO: Make smoother transition
-    inhibit_control = nengo.Node(lambda t: [0,1] if t < 2 else [1,0])
+    #inhibit_control = nengo.Node(lambda t: [0,1] if t < 2 else [1,0])
+    inhibit_control = nengo.Node([0])
     #scale_control = nengo.Node([0]*pattern_num)
 
-    output = nengo.networks.EnsembleArray(n_neurons=100, n_ensembles=output_dims,
-                                          label="output")
+    output = nengo.networks.EnsembleArray(n_neurons=1, n_ensembles=output_dims, radius=np.pi,
+                                          neuron_type=nengo.Direct(), label="output")
 
     # one ensemble array per output pattern
     # each ensemble array has the output dimensions
@@ -134,17 +141,19 @@ with model:
     # SUPER BONUS: use visual assement for the robot to be able to imitate a movement
     # ASIDE: which would be cool, because then maybe the robot could infer properties of objects from movement
 
+    ea_n_neurons = 300
+
     for n_i, nm in enumerate(pattern_file_names):
         # make the EnsembleArray with the associated functions
         name = nm[5:]
-        e = nengo.networks.EnsembleArray(n_neurons=100, n_ensembles=output_dims,
-                                label=name)
+        e = nengo.networks.EnsembleArray(n_neurons=ea_n_neurons, n_ensembles=output_dims,
+                                radius=np.pi, label=name)
         e.add_output("out_"+name, function_list[n_i])
         e.add_neuron_input()
 
         # make the connections for inhibition (proxy for output of BG)
         nengo.Connection(inhibit_control[n_i], e.neuron_input,
-                         transform=np.ones((100*output_dims, 1)) * -3)
+                         transform=np.ones((ea_n_neurons*output_dims, 1)) * -3)
 
         # TODO: make the connections for scaling (proxy for output of Thal)
 
@@ -153,9 +162,9 @@ with model:
         nengo.Connection(getattr(e, "out_"+name), output.input)
 
         ea_list.append(e)
-
+"""
     # probe the output
-    p_out = nengo.Probe(output.output)
+    p_out = nengo.Probe(output.output, synapse=0.003)
 
 with nengo.Simulator(model) as sim:
     sim.run(4)
@@ -169,4 +178,5 @@ for t_i in range(tmp.shape[0]):
 ipdb.set_trace()
 
 # try running the patterns in Matlab to see if they're legit
-scipy.io.savemat("pattern_out.mat", reg_out)
+scipy.io.savemat("pattern_out.mat", {"reg_out": reg_out})
+"""

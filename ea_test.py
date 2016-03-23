@@ -87,9 +87,12 @@ with model:
     # SUPER BONUS: use visual assement for the robot to be able to imitate a movement
     # ASIDE: which would be cool, because then maybe the robot could infer properties of objects from movement
 
+    ea_n_neurons = 300
+
     for n_i, nm in enumerate(pattern_file_names):
         # make the EnsembleArray with the associated functions
         name = nm[5:]
+        print(name)
         e = nengo.networks.EnsembleArray(n_neurons=ea_n_neurons, n_ensembles=output_dims,
                                          radius=np.pi, label=name)
         e.add_output("out_"+name, function_list[n_i])

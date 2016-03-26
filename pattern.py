@@ -23,6 +23,44 @@ def d3_scale(dat, out_range=(-1, 1), in_range=None):
 
     return interp(uninterp(dat))
 
+def make_dmp_net(functions, input_obj, output_obj, name=""):
+    """create one point attractor per dimension with goals as nodes
+    and one unified neuron input for inhibition
+
+    TODO:
+        - make the connections for inhibition (proxy for output of BG)
+        - make the connections for scaling (proxy for output of Thal)
+    """
+    n = nengo.Network(label=name)
+    n.pt_attractors = []
+    n.conn_funcs = []
+    n.f_conns = []
+    with n:
+        n.output = nengo.Node(size_in=len(functions))
+
+        for d in range(len(functions)):
+            goal = nengo.Node([0], label="goal_%s" %(d))
+            attractor = gen_point_attractor(n, goal, n_neurons=500)
+            attractor.label = "pt_attr_%s" %(d)
+            nengo.Connection(attractor[0], n.output[d], synapse=None)
+            n.pt_attractors.append(attractor)
+
+    for f_i, func in enumerate(functions):
+        dest = func(np.linspace(-np.pi, np.pi, ea_func_steps))
+        dest = dest.reshape((-1, 1))
+        force_func = gen_forcing_functions(dest)[0]
+        n.conn_funcs.append(lambda x, force_func=force_func: force(x, force_func))
+
+        # there's still the little bump, but it doesn't seem as bad?
+        # it's just that the force can't change instanteously
+        # it seems like there should be some way to get around that
+        # or maybe it won't matter for large force?
+        n.f_conns.append(nengo.Connection(input_obj, n.pt_attractors[f_i][1], synapse=None,
+                         function=n.conn_funcs[f_i]))
+
+    nengo.Connection(n.output, output_obj)
+    return n
+
 # load the patterns from matlab
 pattern_file_names = (
      "nnRawExaStride",
@@ -43,7 +81,7 @@ pattern_file_names = (
 )
 
 # max is 61, but 14 is a nice leg
-output_dims = 1
+output_dims = 14
 pattern_num = 1
 pattern_file_names = pattern_file_names[:pattern_num]
 
@@ -162,7 +200,7 @@ with model:
         nengo.Connection(getattr(e, "out_"+name), output.input)
 
         ea_list.append(e)
-"""
+
     # probe the output
     p_out = nengo.Probe(output.output, synapse=0.003)
 
@@ -179,4 +217,3 @@ ipdb.set_trace()
 
 # try running the patterns in Matlab to see if they're legit
 scipy.io.savemat("pattern_out.mat", {"reg_out": reg_out})
-"""

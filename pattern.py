@@ -1,3 +1,7 @@
+# complete test
+
+from dmp_utils import *
+
 import scipy.io
 from scipy import interpolate
 import nengo
@@ -5,6 +9,8 @@ import numpy as np
 import ipdb
 
 def d3_scale(dat, out_range=(-1, 1), in_range=None):
+    """scale function for mapping from one range to another stolen from D3.js"""
+
     if in_range == None:
         domain = [np.min(dat, axis=0), np.max(dat, axis=0)]
     else:
@@ -51,10 +57,6 @@ def make_dmp_net(functions, input_obj, output_obj, name=""):
         force_func = gen_forcing_functions(dest)[0]
         n.conn_funcs.append(lambda x, force_func=force_func: force(x, force_func))
 
-        # there's still the little bump, but it doesn't seem as bad?
-        # it's just that the force can't change instanteously
-        # it seems like there should be some way to get around that
-        # or maybe it won't matter for large force?
         n.f_conns.append(nengo.Connection(input_obj, n.pt_attractors[f_i][1], synapse=None,
                          function=n.conn_funcs[f_i]))
 
@@ -81,7 +83,7 @@ pattern_file_names = (
 )
 
 # max is 61, but 14 is a nice leg
-output_dims = 14
+output_dims = 1
 pattern_num = 1
 pattern_file_names = pattern_file_names[:pattern_num]
 
@@ -126,14 +128,16 @@ for n_i, nm in enumerate(pattern_file_names):
         assert np.min(normed_data) >= -1.5
         function_list[-1].append(interpolate.interp1d(xv, normed_data[o_i, :]))
 
-
+ea_n_neurons = 300
+ea_func_steps = 100
 np.random.seed(3)
 # maps from input value (in this case, theta) to output value
 
 model = nengo.Network()
 tau = 0.1
 #model.config[nengo.Ensemble].neuron_type = nengo.Direct()
-ea_list = []
+dmp_net_list = []
+
 with model:
     osc = nengo.Ensemble(n_neurons=1, dimensions=3, neuron_type=nengo.Direct())
 
@@ -159,14 +163,9 @@ with model:
     bump = nengo.Node(lambda t: 1 if t < 0.5 else 0)
     nengo.Connection(bump, osc[0])
 
-    # what's stopping this from being a passthrough node?
-    readout = nengo.Ensemble(n_neurons=1, dimensions=1, radius=np.pi, neuron_type=nengo.Direct())
-    nengo.Connection(osc[:2], readout, synapse=None,
-                     function=lambda x: np.arctan2(x[1], x[0]))
-
     # controllers # TODO: Make smoother transition
     #inhibit_control = nengo.Node(lambda t: [0,1] if t < 2 else [1,0])
-    inhibit_control = nengo.Node([0])
+    #inhibit_control = nengo.Node([0])
     #scale_control = nengo.Node([0]*pattern_num)
 
     output = nengo.networks.EnsembleArray(n_neurons=1, n_ensembles=output_dims, radius=np.pi,
@@ -182,38 +181,37 @@ with model:
     ea_n_neurons = 300
 
     for n_i, nm in enumerate(pattern_file_names):
-        # make the EnsembleArray with the associated functions
         name = nm[5:]
-        e = nengo.networks.EnsembleArray(n_neurons=ea_n_neurons, n_ensembles=output_dims,
-                                radius=np.pi, label=name)
-        e.add_output("out_"+name, function_list[n_i])
-        e.add_neuron_input()
+        print(name)
+        n = make_dmp_net(function_list[n_i], osc[:2], output.input, name=name)
+        dmp_net_list.append(n)
 
-        # make the connections for inhibition (proxy for output of BG)
-        nengo.Connection(inhibit_control[n_i], e.neuron_input,
-                         transform=np.ones((ea_n_neurons*output_dims, 1)) * -3)
+    # Helper nodes for verification
+    arctan = nengo.Node(size_in=1)
+    nengo.Connection(osc[:2], arctan, function=lambda x: np.arctan2(x[0], x[1]), synapse=None)
+    ideal = nengo.Node(lambda t, x: function_list[0][0](x), size_in=1)
+    nengo.Connection(arctan, ideal)
 
-        # TODO: make the connections for scaling (proxy for output of Thal)
-
-        # make input and output connections
-        nengo.Connection(readout, e.input, transform=np.ones((output_dims, 1)))
-        nengo.Connection(getattr(e, "out_"+name), output.input)
-
-        ea_list.append(e)
 
     # probe the output
     p_out = nengo.Probe(output.output, synapse=0.003)
+    p_ideal = nengo.Probe(ideal)
 
 with nengo.Simulator(model) as sim:
     sim.run(4)
 
 # un-normalise on export based off the original domain
-tmp = sim.data[p_out]
-reg_out = np.zeros_like(tmp)
-for t_i in range(tmp.shape[0]):
-    reg_out[t_i, :] = d3_scale(tmp[t_i, :], out_range=min_maxs[o_i],
+# ideal is going to break for dimensions larger than 1
+tmp_out = sim.data[p_out]
+tmp_ideal = sim.data[p_ideal]
+reg_out = np.zeros_like(tmp_out)
+ideal_out = np.zeros_like(tmp_ideal)
+for t_i in range(tmp_out.shape[0]):
+    reg_out[t_i, :] = d3_scale(tmp_out[t_i, :], out_range=min_maxs[o_i],
                                in_range=(-1, 1))
+    ideal_out[t_i, :] = d3_scale(ideal_out[t_i, :], out_range=min_maxs[o_i],
+                           in_range=(-1, 1))
 ipdb.set_trace()
 
 # try running the patterns in Matlab to see if they're legit
-scipy.io.savemat("pattern_out.mat", {"reg_out": reg_out})
+scipy.io.savemat("pattern_out.mat", {"reg_out": reg_out, "ideal_out": ideal_out})

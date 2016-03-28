@@ -54,7 +54,7 @@ def make_dmp_net(functions, input_obj, output_obj, name=""):
     for f_i, func in enumerate(functions):
         dest = func(np.linspace(-np.pi, np.pi, ea_func_steps))
         dest = dest.reshape((-1, 1))
-        force_func = gen_forcing_functions(dest)[0]
+        force_func = gen_forcing_functions(dest, num_samples=50)[0]
         n.conn_funcs.append(lambda x, force_func=force_func: force(x, force_func))
 
         n.f_conns.append(nengo.Connection(input_obj, n.pt_attractors[f_i][1], synapse=None,
@@ -194,24 +194,42 @@ with model:
 
 
     # probe the output
-    p_out = nengo.Probe(output.output, synapse=0.003)
+    p_out = nengo.Probe(output.output, synapse=0.15)
     p_ideal = nengo.Probe(ideal)
 
 with nengo.Simulator(model) as sim:
-    sim.run(4)
+    sim.run(2)
 
 # un-normalise on export based off the original domain
-# ideal is going to break for dimensions larger than 1
+# NOTE: ideal is going to break for dimensions larger than 1
 tmp_out = sim.data[p_out]
 tmp_ideal = sim.data[p_ideal]
 reg_out = np.zeros_like(tmp_out)
+reg_min = np.min(tmp_out)
+reg_max = np.max(tmp_out)
+out_scaled = np.zeros_like(tmp_out)
+compressed = []
 ideal_out = np.zeros_like(tmp_ideal)
-for t_i in range(tmp_out.shape[0]):
-    reg_out[t_i, :] = d3_scale(tmp_out[t_i, :], out_range=min_maxs[o_i],
-                               in_range=(-1, 1))
-    ideal_out[t_i, :] = d3_scale(ideal_out[t_i, :], out_range=min_maxs[o_i],
-                           in_range=(-1, 1))
+for t_i in range(tmp_out.shape[1]):
+    # additional filtering for reg_out to stop the crazy jitters
+    # TODO: compare with guassian?
+    tmp_scaled = d3_scale(tmp_out[:, t_i], out_range=min_maxs[0],
+                          in_range=(reg_min, reg_max))
+
+    out_scaled[:, t_i] = tmp_scaled
+
+    good_shape = 1000
+    sample_interval = int( good_shape / raw_dats[0].shape[1])
+    re_size = good_shape + good_shape % sample_interval
+    compressed.append(nengo.Lowpass(0.005).filt(
+                      tmp_scaled[re_size:][::sample_interval], dt=0.001))
+
+
+    reg_out[:, t_i] = nengo.Lowpass(0.1).filt(tmp_scaled, dt=0.001)
+    ideal_out[:, t_i] = d3_scale(tmp_ideal[:, t_i], out_range=min_maxs[0],
+                           in_range=(-1, 1))[re_size:][::sample_interval]
+
 ipdb.set_trace()
 
 # try running the patterns in Matlab to see if they're legit
-scipy.io.savemat("pattern_out.mat", {"reg_out": reg_out, "ideal_out": ideal_out})
+scipy.io.savemat("pattern_out.mat", {"out_scaled": out_scaled, "reg_out": reg_out, "ideal_out": ideal_out, "compressed": compressed})

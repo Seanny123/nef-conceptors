@@ -6,15 +6,16 @@ import ipdb
 import matplotlib.pyplot as plt
 
 
-def gen_forcing_functions(y_des, dt=.001, alpha=10, beta=10/4.):
+def gen_forcing_functions(y_des, dt=.001, alpha=10, beta=10/4., num_samples=10):
         
         # scale our trajectory and find the center point
-        y_des = y_des.T / 1e5
+        y_des = y_des.T / 1e5 #s this is the speed control that decides what units everything should be in and how fast the action runs
         goal = np.sum(y_des, axis=1) / y_des.shape[1]
 
         # interpolate our desired trajectory to smooth out the sampling
-        #s this makes it more boxy by drawing lines between the sample points
-        num_samples = 10
+        # number of samples is hard to choose optimally. Too few samples and
+        # you lose import features. Too many and the derivatives shrink to
+        # nothing and are useless
         path = np.zeros((y_des.shape[0], num_samples))
         x = np.linspace(-np.pi, np.pi, y_des.shape[1])
         for d in range(y_des.shape[0]):
@@ -23,21 +24,32 @@ def gen_forcing_functions(y_des, dt=.001, alpha=10, beta=10/4.):
                 path[d, ii] = path_gen(t)
         y_des = path
 
-        # calculate velocity of y_des
-        #s calculate the velocity for every point of the path
+        # calculate velocity of y_des at every point in the path by taking the
+        # derivative of the discrete signal
         dy_des = np.diff(y_des) / dt
-        # add zero to the beginning of every row
-        #s why? that adds to the jerk!
-        # would adding more eval points reduce the jerk?
-        dy_des = np.hstack((np.zeros((y_des.shape[0], 1)), dy_des))
+        # add the end of the signal to the beginning of every row
+        # so the derivative is more smooth
+        dy_des = np.hstack(
+            (
+                dy_des[:, -1].reshape((-1, 1)),
+                dy_des,
+            )
+        )
 
         # calculate acceleration of y_des
         ddy_des = np.diff(dy_des) / dt
-        # add zero to the beginning of every row
-        ddy_des = np.hstack((np.zeros((y_des.shape[0], 1)), ddy_des))
-        #ipdb.set_trace()
-        #plt.plot(y_des[0]*1e6)
-        #plt.plot(dy_des[0]*1e2)
+        # add the end of the signal to the beginning of every row
+        # so the derivative is more smooth
+        ddy_des = np.hstack(
+            (
+                ddy_des[:, -1].reshape((-1, 1)),
+                ddy_des,
+            )
+        )
+
+        # plot the derivatives with respect to the original signal
+        #plt.plot(y_des[0]*1e4)
+        #plt.plot(dy_des[0]*1e1)
         #plt.plot(ddy_des[0])
         #plt.show()
 
@@ -45,7 +57,6 @@ def gen_forcing_functions(y_des, dt=.001, alpha=10, beta=10/4.):
         for d in range(y_des.shape[0]):
             # find the force required to move along this trajectory
             # by subtracting out the effects of the point attractor
-            #s WTF, the force is fine, but the inversion gets lost later!
             force = ddy_des[d] - alpha * \
                             (beta * (goal[d] - y_des[d]) - \
                              dy_des[d])

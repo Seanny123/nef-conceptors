@@ -83,7 +83,7 @@ pattern_file_names = (
 )
 
 # max is 61, but 14 is a nice leg
-output_dims = 1
+output_dims = 5
 pattern_num = 1
 pattern_file_names = pattern_file_names[:pattern_num]
 
@@ -209,12 +209,16 @@ reg_min = np.min(tmp_out)
 reg_max = np.max(tmp_out)
 out_scaled = np.zeros_like(tmp_out)
 compressed = []
-ideal_out = np.zeros_like(tmp_ideal)
+final_out = []
+#ideal_out = []
 for t_i in range(tmp_out.shape[1]):
     # additional filtering for reg_out to stop the crazy jitters
     # TODO: compare with guassian?
-    tmp_scaled = d3_scale(tmp_out[:, t_i], out_range=min_maxs[0],
+    tmp_scaled = d3_scale(tmp_out[:, t_i], out_range=min_maxs[t_i],
                           in_range=(reg_min, reg_max))
+    print("Iinitial min: %s Initial max: %s" %(reg_min, reg_max))
+    print("Scaled min: %s Scaled max: %s" %(np.min(tmp_scaled), np.max(tmp_scaled)))
+    print("Intended min: %s Intended max %s" %(min_maxs[t_i][0], min_maxs[t_i][1]))
 
     out_scaled[:, t_i] = tmp_scaled
 
@@ -223,13 +227,23 @@ for t_i in range(tmp_out.shape[1]):
     re_size = good_shape + good_shape % sample_interval
     compressed.append(nengo.Lowpass(0.005).filt(
                       tmp_scaled[re_size:][::sample_interval], dt=0.001))
-
+    print("Compressed min: %s, Compressed max: %s" %(np.min(compressed[t_i]), np.max(compressed[t_i])))
+    final_out.append(d3_scale(compressed[t_i],
+                              in_range=(np.min(compressed[t_i]), np.max(compressed[t_i])),
+                              out_range=min_maxs[t_i]))
+    final_max = np.max(final_out[t_i])
+    final_min = np.min(final_out[t_i])
+    print("Final min: %s, Final max: %s\n" %(final_min, final_max))
+    print("Final diff: %s\n\n" %(
+          np.abs(min_maxs[t_i][0]-final_min) + np.abs(min_maxs[t_i][1]-final_max)))
 
     reg_out[:, t_i] = nengo.Lowpass(0.1).filt(tmp_scaled, dt=0.001)
-    ideal_out[:, t_i] = d3_scale(tmp_ideal[:, t_i], out_range=min_maxs[0],
-                           in_range=(-1, 1))[re_size:][::sample_interval]
+    #ideal_out.append(d3_scale(tmp_ideal[:, t_i], out_range=min_maxs[0],
+    #                       in_range=(-1, 1))[re_size:][::sample_interval])
 
-ipdb.set_trace()
 
 # try running the patterns in Matlab to see if they're legit
-scipy.io.savemat("pattern_out.mat", {"out_scaled": out_scaled, "reg_out": reg_out, "ideal_out": ideal_out, "compressed": compressed})
+# I GOT A LEG
+#scipy.io.savemat("pattern_out.mat", {"out_scaled": out_scaled, "reg_out": reg_out, "ideal_out": ideal_out, "compressed": compressed})
+scipy.io.savemat("pattern_out.mat", {"out_scaled": out_scaled, "reg_out": reg_out, "compressed": compressed})
+scipy.io.savemat("final_pattern.mat", {"final_out": final_out})

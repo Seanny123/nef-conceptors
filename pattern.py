@@ -83,7 +83,7 @@ pattern_file_names = (
 )
 
 # max is 61, but 14 is a nice leg
-output_dims = 5
+output_dims = 61
 pattern_num = 1
 pattern_file_names = pattern_file_names[:pattern_num]
 
@@ -198,7 +198,7 @@ with model:
     p_ideal = nengo.Probe(ideal)
 
 with nengo.Simulator(model) as sim:
-    sim.run(2)
+    sim.run(6)
 
 # un-normalise on export based off the original domain
 # NOTE: ideal is going to break for dimensions larger than 1

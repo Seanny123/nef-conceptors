@@ -1,4 +1,4 @@
-# complete test
+# try blending between two patterns
 
 from dmp_utils import *
 from process import *
@@ -65,7 +65,7 @@ pattern_file_names = (
 
 # max is 61, but 14 is a nice leg
 output_dims = 61
-pattern_num = 1
+pattern_num = 2
 pattern_file_names = pattern_file_names[:pattern_num]
 
 function_list, min_maxs = pre(output_dims, pattern_file_names)
@@ -102,12 +102,12 @@ with model:
     rate = nengo.Node([1])
     nengo.Connection(rate, osc[2])
 
-    bump = nengo.Node(lambda t: 1 if t < 0.5 else 0)
+    bump = nengo.Node(lambda t: 1 if t < 0.05 else 0)
     nengo.Connection(bump, osc[0])
 
     # controllers # TODO: Make smoother transition
     #inhibit_control = nengo.Node(lambda t: [0,1] if t < 2 else [1,0])
-    #inhibit_control = nengo.Node([0])
+    inhibit_control = nengo.Node([0, 0])
     #scale_control = nengo.Node([0]*pattern_num)
 
     output = nengo.networks.EnsembleArray(n_neurons=1, n_ensembles=output_dims, radius=np.pi,
@@ -120,26 +120,30 @@ with model:
     # SUPER BONUS: use visual assement for the robot to be able to imitate a movement
     # ASIDE: which would be cool, because then maybe the robot could infer properties of objects from movement
 
-    ea_n_neurons = 300
+    ea_n_neurons = 500
 
     for n_i, nm in enumerate(pattern_file_names):
         name = nm[5:]
         print(name)
-        n = make_dmp_net(function_list[n_i], osc[:2], output.input, name=name)
-        dmp_net_list.append(n)
+        # first just get inhibition working
+        # then convert this normal ensemble array into a fancy multiplication array
+        inhib_ea = nengo.networks.EnsembleArray(ea_n_neurons, output_dims, neuron_type=nengo.LIFRate())
+        inhib_ea.add_neuron_input()
 
-    # Helper nodes for verification
-    arctan = nengo.Node(size_in=1)
-    nengo.Connection(osc[:2], arctan, function=lambda x: np.arctan2(x[0], x[1]), synapse=None)
-    ideal = nengo.Node(lambda t, x: function_list[0][0](x), size_in=1)
-    nengo.Connection(arctan, ideal)
+        n = make_dmp_net(function_list[n_i], osc[:2], inhib_ea.input, name=name)
+
+        nengo.Connection(inhibit_control[n_i], inhib_ea.neuron_input, transform=np.ones((ea_n_neurons*output_dims, 1)) * -10)
+        nengo.Connection(inhib_ea.output, output.input)
+        dmp_net_list.append(n)
 
 
     # probe the output
     p_out = nengo.Probe(output.output, synapse=0.15)
-    p_ideal = nengo.Probe(ideal)
 
 with nengo.Simulator(model) as sim:
-    sim.run(4)
+    sim.run(3)
 
-post(sim, p_out, min_maxs)
+# despite both of these things working on their own initially
+# trying to run them seperately messed up the scale so weird stuff happened
+# when I run them together, what happens?
+post(sim, p_out, min_maxs, final_only=False)

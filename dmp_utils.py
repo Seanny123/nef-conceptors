@@ -69,7 +69,8 @@ def gen_forcing_functions(y_des, dt=.001, alpha=10, beta=10/4., num_samples=10):
 def gen_point_attractor(model, in_goal, n_neurons=200, alpha=10, beta=10/4.):
     # create an ensemble with point attractor dynamics
     with model: 
-        yz = nengo.Ensemble(n_neurons=n_neurons, dimensions=2, radius=5)
+        yz = nengo.Ensemble(n_neurons=n_neurons, dimensions=2, radius=5,
+                            neuron_type=nengo.LIFRate())
         # set up recurrent connection for system state, which 
         # specify the rate of change of each dimension represented.
         # first row of the transform is dyz, second row is ddyz

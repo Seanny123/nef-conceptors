@@ -162,9 +162,14 @@ if showVideo
     
     freq = 120;
     
-    %load pattern_out;
-    tmp = p1;
-    tmp(:, 14:end) = 0;
+    load final_pattern;
+    %tmp = p1;
+    %test_num = 15;
+    test_len = 291;
+    %est_len=151;
+    %tmp(:, 15:end) = 0;
+    %tmp(:, 1:test_num) = final_out(1:test_num, 1:test_len)';
+    tmp = fliplr(final_out(:, 1:test_len))';
     
     djrecovered = ...
         nnRaw2jHJ_absH(tmp, hmean, segmentlengths, ...

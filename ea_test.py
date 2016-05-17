@@ -4,6 +4,48 @@ import scipy.io
 from scipy import interpolate
 import nengo
 import numpy as np
+from dmp_utils import *
+import matplotlib.pyplot as plt
+import ipdb
+
+def make_dmp_net(functions, input_obj, output_obj, name=""):
+    """create one point attractor per dimension with goals as nodes
+    and one unified neuron input for inhibition
+
+    TODO:
+        - make the connections for inhibition (proxy for output of BG)
+        - make the connections for scaling (proxy for output of Thal)
+    """
+    n = nengo.Network(label=name)
+    n.pt_attractors = []
+    n.conn_funcs = []
+    n.f_conns = []
+    with n:
+        n.output = nengo.Node(size_in=len(functions))
+
+        for d in range(len(functions)):
+            goal = nengo.Node([0], label="goal_%s" %(d))
+            attractor = gen_point_attractor(n, goal, n_neurons=500)
+            attractor.label = "pt_attr_%s" %(d)
+            nengo.Connection(attractor[0], n.output[d], synapse=None)
+            n.pt_attractors.append(attractor)
+
+    for f_i, func in enumerate(functions):
+        dest = func(np.linspace(-np.pi, np.pi, ea_func_steps))
+        dest = dest.reshape((-1, 1))
+        force_func = gen_forcing_functions(dest)[0]
+        n.conn_funcs.append(lambda x, force_func=force_func: force(x, force_func))
+
+        # there's still the little bump, but it doesn't seem as bad?
+        # it's just that the force can't change instanteously
+        # it seems like there should be some way to get around that
+        # or maybe it won't matter for large force?
+        n.f_conns.append(nengo.Connection(input_obj, n.pt_attractors[f_i][1], synapse=None,
+                         function=n.conn_funcs[f_i]))
+
+    nengo.Connection(n.output, output_obj, synapse=None)
+    return n
+
 
 pattern_file_names = [
      "nnRawExaStride",
@@ -29,21 +71,20 @@ pattern_file_names = pattern_file_names[:pattern_num]
 
 function_list = [
     [
-        lambda x: np.cos(x)/2,
-        lambda x: np.sin(x)/2
-    ],
-    [
-        lambda x: x/2,
-        lambda x: -x/2
-    ],
+        lambda x: np.sin(x),
+        lambda x: -np.sin(x)
+    ]
 ]
 
+ea_n_neurons = 300
+ea_func_steps = 100
 np.random.seed(3)
 # maps from input value (in this case, theta) to output value
 
 model = nengo.Network()
 tau = 0.1
-ea_list = []
+dmp_net_list = []
+
 with model:
     osc = nengo.Ensemble(n_neurons=1, dimensions=3, neuron_type=nengo.Direct())
 
@@ -69,11 +110,6 @@ with model:
     bump = nengo.Node(lambda t: 1 if t < 0.5 else 0)
     nengo.Connection(bump, osc[0])
 
-    # what's stopping this from being a passthrough node?
-    readout = nengo.Ensemble(n_neurons=1, dimensions=1, radius=np.pi, neuron_type=nengo.Direct())
-    nengo.Connection(osc[:2], readout, synapse=None,
-                     function=lambda x: np.arctan2(x[1], x[0]))
-
     # controllers
     #inhibit_control = nengo.Node([0])
     #scale_control = nengo.Node([0]*pattern_num)
@@ -87,25 +123,21 @@ with model:
     # SUPER BONUS: use visual assement for the robot to be able to imitate a movement
     # ASIDE: which would be cool, because then maybe the robot could infer properties of objects from movement
 
-    ea_n_neurons = 300
-
     for n_i, nm in enumerate(pattern_file_names):
-        # make the EnsembleArray with the associated functions
         name = nm[5:]
         print(name)
-        e = nengo.networks.EnsembleArray(n_neurons=ea_n_neurons, n_ensembles=output_dims,
-                                         radius=np.pi, label=name)
-        e.add_output("out_"+name, function_list[n_i])
-        e.add_neuron_input()
+        n = make_dmp_net(function_list[n_i], osc[:2], output.input, name=name)
+        dmp_net_list.append(n)
 
-        # make the connections for inhibition (proxy for output of BG)
-        #nengo.Connection(inhibit_control[n_i], e.neuron_input,
-        #                 transform=np.ones((100*output_dims, 1)) * -3)
+"""
+    # probe the output
+    p_out = nengo.Probe(output.output, synapse=0.003)
 
-        # TODO: make the connections for scaling (proxy for output of Thal)
+with nengo.Simulator(model) as sim:
+    sim.run(4)
 
-        # make input and output connections
-        nengo.Connection(readout, e.input, transform=np.ones((output_dims, 1)))
-        nengo.Connection(getattr(e, "out_"+name), output.input)
+# un-normalise on export based off the original domain
 
-        ea_list.append(e)
+plt.plot(sim.data[p_out])
+plt.show()
+"""

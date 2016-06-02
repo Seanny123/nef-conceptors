@@ -20,12 +20,16 @@ def similarity(v1, v2):
     dot /= max(npext.norm(v2), eps)
     return dot
 
-
+# TODO: figure out how to use the Nengo parameters
 def InverseDMP(n_per_d, forcing_f, scale=0.7, reset_scale=2.5,
                similarity_th=0.6, tau=0.05, net=None):
     """Get the current state from a system with a forcing function
 
-    What's the forcing function? Do I have to get it from the DMP?"""
+    What effect do all these arguments have?
+
+    What the hell is the output of this thing? Is it state[0]?
+    Is it the position on the arctan2 ramp-like thing?
+    How can I test that? Test if the ramp fucking works. Then test if a sinusoid with a ramp works. Then find out if I can get a function off of the decoders and pass that into the iDMP or if I can just pass the original signal?"""
 
     if net is None:
         net = nengo.Network(label="Inverse Rhythmic DMP")

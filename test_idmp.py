@@ -2,28 +2,24 @@ import nengo
 import numpy as np
 
 from idmp import InverseDMP
+from preprocess import *
 
+# load some sigs
+# see if Eric's point eval thing can save me some time
+# YES IT CAN, BUT I CAN'T FIGURE IT OUT
 
-def heart_func(x):
-    theta = np.arctan2(x[1], x[0])
-    r = 2 - 2 * np.sin(theta) + np.sin(theta)*np.sqrt(np.abs(np.cos(theta)))/(np.sin(theta)+1.4)
-    return -r*np.cos(theta), r*np.sin(theta)
-
-def negheart_func(x):
-    theta = np.arctan2(x[1], x[0])
-    r = 1 - 1 * np.sin(theta) + np.sin(theta)*np.sqrt(np.abs(np.cos(theta)))/(np.sin(theta)+1.4)
-    return r*np.cos(theta), -r*np.sin(theta)
-
-def figure_8(x):
-    return x[0]*x[1], x[1]
-
-# create an oscillator and a figure-8 oscillator
+# create two oscillators with the same start point
 # see if the position decoded from them is the same
 
-# create a heart oscillator with a different oscillator start
+# create a shifted oscillator or at least one with a different start
 # check that it's position is different
 
 # see if forcing functions are truly necessary
+
+
+dt = 0.001
+trange = (0, np.round(2*np.pi, decimals=3))
+filename = "processed/out_61_pn_2.npz"
 
 model = nengo.Network()
 tau = 0.1
@@ -53,11 +49,27 @@ with model:
     bump = nengo.Node(lambda t: 1 if t < 0.5 else 0)
     nengo.Connection(bump, osc[0])
 
-    heart = nengo.Ensemble(200, 2)
-    nengo.Connection(osc[:2], heart, function=heart_func)
+    ramp = nengo.Ensemble(200, 1)
+    nengo.Connection(osc[:2], ramp,
+        function=lambda x: np.arctan2(x[0], x[1]))
 
-    neg_heart = nengo.Ensemble(200, 2)
-    nengo.Connection(osc[:2], neg_heart, function=negheart_func)
+    ramp_idmp = InverseDMP(600, lambda x: np.array([x]))
+    nengo.Connection(ramp, ramp_idmp.input)
+
+    out_ramp = nengo.Node(size_in=1)
+    nengo.Connection(ramp_idmp.state[0], out_ramp)
+
+    sin_ramp = nengo.Node(size_in=1)
+    nengo.Connection(ramp, sin_ramp,
+        function=lambda x: x * np.sin(x))
+
+    # none type stuff seems to happen after creating an object and manipulating it?
+    # sin ramp is definitely not working, GET HELP
+    sin_idmp = InverseDMP(600, lambda x: x * np.sin([x]))
+    nengo.Connection(sin_ramp, sin_idmp.input)
+
+    out_sin = nengo.Node(size_in=1)
+    nengo.Connection(sin_idmp.state[0], out_sin)
 
     sec_osc = nengo.Ensemble(n_neurons=1500, dimensions=3, radius=1.4)
 
@@ -66,6 +78,6 @@ with model:
     nengo.Connection(rate, sec_osc[2], transform=[-1])
     nengo.Connection(sec_osc, sec_osc[:2], synapse=tau, function=cycle)
 
-    fig8 = nengo.Ensemble(200, 2)
-    nengo.Connection(sec_osc[:2], fig8, function=figure_8)
-
+    del_ramp = nengo.Node(size_in=1)
+    nengo.Connection(sec_osc[:2], del_ramp,
+        function=lambda x: np.arctan2(x[0], x[1]))

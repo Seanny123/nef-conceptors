@@ -4,6 +4,8 @@ import scipy
 import scipy.io
 from scipy import interpolate
 
+# TODO: remove "d3_scale" and "pre", then rename the file to postprocess
+
 def d3_scale(dat, out_range=(-1, 1), in_range=None):
     """scale function for mapping from one range to another stolen from D3.js"""
 

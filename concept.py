@@ -39,7 +39,7 @@ n_sigs = len(sigs)
 apert = np.ones(n_sigs) * 10
 t_len = t_period*t_scale
 
-rate_data = np.zeros((n_sigs, t_len)) # this should be a numpy array
+rate_data = np.zeros((n_sigs, t_len))  # this should be a numpy array
 pat_data = np.zeros((n_sigs, t_len))
 n_neurons = 1000
 w_rec = np.random.uniform(-0.5, 0.5, size=(n_neurons, n_neurons)) / n_neurons

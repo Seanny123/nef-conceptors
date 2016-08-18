@@ -1,13 +1,20 @@
+from utils import gen_w_rec, get_conceptors
+
 import nengo
 import nengo.solvers
 
 import numpy as np
+import matplotlib.pyplot as plt
+
+import ipdb
 
 SEED = 0
 
 dt = 0.001
 t_scale = 0.5
 t_period = 1.0
+n_neurons = 1000
+sig_dims = 1
 
 
 def conv_t(t):
@@ -38,17 +45,16 @@ sigs = [
 n_sigs = len(sigs)
 apert = np.ones(n_sigs) * 10
 t_len = t_period*t_scale
+t_steps = int(t_len / dt)
 
-rate_data = np.zeros((n_sigs, t_len))  # this should be a numpy array
-pat_data = np.zeros((n_sigs, t_len))
-n_neurons = 1000
-w_rec = np.random.uniform(-0.5, 0.5, size=(n_neurons, n_neurons)) / n_neurons
-w_rec /= np.max(np.abs(np.linalg.eigvals(w_rec)))
-w_rec /= n_neurons
+rate_data = np.zeros((n_sigs, t_steps, n_neurons))
+pat_data = np.zeros((n_sigs, t_steps))
+
+w_rec = gen_w_rec(n_neurons)
 
 for i_s, sig in enumerate(sigs):
     # get the rate data
-    with nengo.Network as rate_acc:
+    with nengo.Network() as rate_acc:
         in_sig = nengo.Node(sig)
         sig_reserv = nengo.Ensemble(n_neurons, 1, neuron_type=nengo.LIFRate(), seed=SEED)
 
@@ -58,38 +64,47 @@ for i_s, sig in enumerate(sigs):
         p_pat = nengo.Probe(in_sig)
 
     with nengo.Simulator(rate_acc) as rate_sim:
-        rate_sim.run(t_period*t_scale*2)
+        rate_sim.run(t_len*2)
 
-    rate_data[i_s, :] = (rate_sim.data[p_rate][t_period*t_scale:])
-    pat_data[i_s, :] = (rate_sim.data[p_pat][t_period*t_scale:])
+    rate_data[i_s] = rate_sim.data[p_rate][t_steps:]
+    pat_data[i_s] = rate_sim.data[p_pat][t_steps:, sig_dims-1]
 
 # get the output weights using the usual decoder math
 solver = nengo.solvers.LstsqL2(reg=0.02)
-w_out, _ = solver(rate_data, pat_data)
+w_out, _ = solver(
+    rate_data.reshape((t_steps*n_sigs, -1)),
+    pat_data.reshape((t_steps*n_sigs, -1)),
+
+)
+# TODO: compare RMSE
 
 # do SVD on the neuron data to get Conceptors
-conceptors = []
-for i_s in range(n_sigs):
-    r_dat = rate_data[i_s, :]
-    rate_corr = np.dot(r_dat, r_dat.T) / t_len
-    unit, sing_vals, _ = np.linalg.svd(rate_corr)
-    assert sing_vals.shape == np.eye(n_neurons)
-    s_new = np.dot(sing_vals, np.linalg.pinv(sing_vals + apert[i_s]**-2 * np.eye(n_neurons)))
-    conceptors.append(np.dot(np.dot(unit, s_new), unit.T))
+# slowest part of the process and appears to only be using one core
+conceptors = get_conceptors(rate_data, n_sigs, t_steps, apert, n_neurons)
+
+# this process gives a n_neuron dim conceptor. Is this what Matlab gives?
 
 
 def conc_func(t, x):
     """change periodically between output patterns for testing"""
-    return x * conceptors[int(t % (t_period*t_scale))]
+    # is this supposed to be a dot product or a multiplication?
+    return np.dot(x, conceptors[int(t % t_len)])
 
 
 # use it for Conceptor testing
-with nengo.Network as conc_model:
+with nengo.Network() as conc_model:
     reserv = nengo.Ensemble(n_neurons, 1, neuron_type=nengo.LIFRate(), seed=SEED)
-    conc_node = nengo.Node(conc_func)
+    conc_node = nengo.Node(conc_func, size_in=n_neurons)
     output = nengo.Node(size_in=1)
 
     nengo.Connection(reserv.neurons, conc_node, transform=w_rec)
-    nengo.Connection(reserv.neurons, output, transform=w_out)
+    nengo.Connection(reserv.neurons, output, transform=w_out[None, :, sig_dims-1])
 
     p_res = nengo.Probe(output)
+
+with nengo.Simulator(conc_model) as conc_sim:
+    conc_sim.run(t_len*n_sigs)
+
+plt.plot(conc_sim.data[p_res])
+plt.show()
+ipdb.set_trace()

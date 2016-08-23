@@ -6,10 +6,8 @@ set(0,'DefaultFigureWindowStyle','docked');
 
 %%% Experiment control
 randstate = 1; % random seed for creating network weights
-showStates = 0; % whether to plot some reservoir states obtained during testing
-showSingVals = 0; % whether to plot singular value spectra of conceptors
-showOutTraces = 0; % whether to plot outputs of some of the 61 pattern dimensions
-                   % collected for the entire demo run
+showStates = 1; % whether to plot some reservoir states obtained during testing
+showSingVals = 1; % whether to plot singular value spectra of conceptors
 
 %%% a few constants
 nP = 2; % nr of patterns; if you experiment with additional patterns
@@ -40,9 +38,10 @@ CtestLength = 1000;
 %%% setting sequence order of patterns to be displayed
 pattOrder = [1 2];
 %%% setting durations of each pattern episode (note: 120 frames = 1 sec)
-tSteps = 0:0.001:0.5;
+tMax = 0.5;
+tSteps = 0:0.001:tMax;
 tLen = size(tSteps, 2);
-pattDurations = [tLen, tLen];
+pattDurations = [tMax, tMax];
 %%% setting durations for morphing transitions between two subsequent patterns
 pattTransitions = 120 * ones(1, length(pattOrder)-1);
 
@@ -53,8 +52,8 @@ stateNL = 0.;
 
 
 %%% Initialise the patterns
-sinPer = (2 * pi * 10) / tLen;
-cosPer = (2 * pi * 20) / tLen;
+sinPer = (2 * pi * 10) / tMax;
+cosPer = (2 * pi * 20) / tMax;
 p1 = sin(tSteps*sinPer)';
 p2 = 0.5*cos(tSteps*cosPer)';
 
@@ -199,11 +198,11 @@ for p = 1:nP
         
         x_CTestPLSingle(:,n,p) = x(1:10,1);
         x = C * x;
-        p_CTestPLSingle(:,n,p) = Wout * [x; 1];
+        p_CTestPLSingle(:,n,p) = Wout * [x; 1]; % WTF, why append "1"?
     end
 end
 
-%%% Try bleding later
+%%% Try blending later
 
 %%% plotting
 
@@ -215,19 +214,19 @@ set(gcf,'Position', [800 100 800 800]);
 subplotCounter = 0;
 
 for p = 1:nP
-    for pick = 1:length(plotPicks)
-        subplotCounter = subplotCounter + 1;
-        subplot(nP, length(plotPicks), subplotCounter);
-        hold on;
-        plot(1:pattlengths(p) - washoutLength, ...
-            patts{p}(washoutLength+1:end,plotPicks(pick))',...
-            'b');
-        plot(1:CtestLength, p_CTestPLSingle(plotPicks(pick),:,p)', 'r');
-        plot(1:size(outsTrain{p}(:,plotPicks(pick)),1), ...
-            outsTrain{p}(:,plotPicks(pick)), 'g');
-        hold off;
-        % set(gca, 'YLim', [-1 1]);
-    end
+    subplotCounter = subplotCounter + 1;
+    subplot(nP, 1, subplotCounter);
+
+    hold on;
+    % reference
+    plot(1:pattlengths(p) - washoutLength, patts{p}(washoutLength+1:end)', 'b');
+    % conceptor
+    plot(1:CtestLength, p_CTestPLSingle(1,:,p)', 'r');
+    % after initial training
+    %plot(1:size(outsTrain{p},1), outsTrain{p}, 'g');
+    hold off;
+
+    % set(gca, 'YLim', [-1 1]);
 end
 
 
@@ -258,18 +257,5 @@ if showSingVals
         if p == 1
             title('C singvals');
         end
-    end
-end
-
-%%% plot some output traces obtained for the full-length simulation
-if showOutTraces && showVideo
-    figure(4); clf;
-    set(gcf, 'WindowStyle','normal');
-    set(gcf,'Position', [800 350 800 120]);
-    for pick = 1:length(plotPicks)
-        subplot(1, length(plotPicks), pick);
-        plot(p_CTestPLMorph(plotPicks(pick),:)', 'r');
-        set(gca, 'YLim', [-1 1]);
-        
     end
 end

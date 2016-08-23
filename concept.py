@@ -13,12 +13,13 @@ SEED = 0
 dt = 0.001
 t_scale = 0.5
 t_period = 1.0
+t_len = t_period*t_scale
 n_neurons = 600  # same as Matlab
 sig_dims = 1
 
 
 def conv_t(t):
-    return t % (t_period*t_scale)
+    return t % t_len
 
 
 def funky_sig(t):
@@ -35,7 +36,6 @@ def funky_sig(t):
     else:
         return 0
 
-t_len = t_period*t_scale
 t_steps = int(t_len / dt)
 
 sin_per = (2 * np.pi * 10) / t_len
@@ -74,30 +74,33 @@ for i_s, sig in enumerate(sigs):
     pat_data[i_s] = rate_sim.data[p_pat][t_steps:, sig_dims-1]
 
 # get the output weights using the usual decoder math
+# previously verified by decoding original activities
 solver = nengo.solvers.LstsqL2(reg=0.02)
 w_out, d_info = solver(
     rate_data.reshape((t_steps*n_sigs, -1)),
     pat_data.reshape((t_steps*n_sigs, -1)),
 
 )
-# Matlab NRMSE is 0.007 which I think is close enough? Test it by re-running the network?
-print("RMSE: %s" % d_info['rmses'])
 
 # do SVD on the neuron data to get Conceptors
 # slowest part of the process and appears to only be using one core
 conceptors = get_conceptors(rate_data, n_sigs, t_steps, apert, n_neurons)
 
 
+def get_idx(t):
+    return int(np.floor(t % (t_len * n_sigs) / t_len))
+
+
 def conc_func(t, x):
     """change periodically between output patterns for testing"""
-    return np.dot(conceptors[int(t % t_len)], x)
+    return np.dot(conceptors[get_idx(t)], x)
 
 
 def kick_func(t):
     """initialise the neurons"""
     tt = conv_t(t)
     if tt < 0.1 * t_scale:
-        return init_x[int(t % t_len)]
+        return init_x[get_idx(t)]
     else:
         return 0
 
@@ -107,17 +110,23 @@ with nengo.Network() as conc_model:
     reserv = nengo.Ensemble(n_neurons, 1, neuron_type=nengo.LIFRate(), seed=SEED)
     conc_node = nengo.Node(conc_func, size_in=n_neurons)
     output = nengo.Node(size_in=1)
+    sanity = nengo.Node(get_idx)
 
     nengo.Connection(kick, reserv.neurons, synapse=None)
     nengo.Connection(reserv.neurons, conc_node, transform=w_rec, synapse=0)
     nengo.Connection(conc_node, reserv.neurons, synapse=None)
     nengo.Connection(reserv.neurons, output, transform=w_out.T)
 
+    p_rate = nengo.Probe(reserv.neurons)
     p_res = nengo.Probe(output)
+    p_kick = nengo.Probe(kick)
+    p_conc = nengo.Probe(conc_node)
+    p_san = nengo.Probe(sanity)
 
 with nengo.Simulator(conc_model) as conc_sim:
     conc_sim.run(t_len*n_sigs)
 
 plt.plot(conc_sim.trange(), conc_sim.data[p_res])
 plt.show()
+
 ipdb.set_trace()

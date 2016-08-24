@@ -47,9 +47,6 @@ pattTransitions = 120 * ones(1, length(pattOrder)-1);
 
 plotPicks = [1 1 1 1 1]; % which input dimensions are plotted
 
-%%% additive state noise level inserted during testing and video generation
-stateNL = 0.;
-
 
 %%% Initialise the patterns
 sinPer = (2 * pi * 10) / tMax;
@@ -95,7 +92,7 @@ Wbias = BiasScaling * WbiasRaw;
 totalDataLength = sum(pattlengths);
 totalLearnLength = totalDataLength - nP * washoutLength;
 
-allTrainxArgs = zeros(Netsize + 1, 0);
+allTrainxArgs = zeros(Netsize, 0);
 allTrainOldxArgs = zeros(Netsize, 0);
 allTrainWtargets = zeros(Netsize, 0);
 allTrainOuts = zeros(pattDim, 0);
@@ -106,7 +103,7 @@ startXs = zeros(Netsize, nP);
 for p = 1:nP
     patt = patts{p}; % current pattern
     learnLength = pattlengths(p) - washoutLength;
-    xCollector = zeros(Netsize + 1, learnLength );
+    xCollector = zeros(Netsize, learnLength );
     xOldCollector = zeros(Netsize, learnLength );
     WTargetCollector = zeros(Netsize, learnLength);
     pCollector = zeros(pattDim, learnLength );
@@ -120,7 +117,7 @@ for p = 1:nP
             startXs(:,p) = x;
         end
         if n > washoutLength
-            xCollector(:, n - washoutLength ) = [x; 1];
+            xCollector(:, n - washoutLength ) = x;
             xOldCollector(:, n - washoutLength ) = xOld;
             WTargetCollector(:, n - washoutLength ) = Wtarget;
             pCollector(:, n - washoutLength) = u;
@@ -128,7 +125,7 @@ for p = 1:nP
         end
         uOld = u;
     end
-    patternRs{p} = xCollector(1:end-1,:) * xCollector(1:end-1,:)'...
+    patternRs{p} = xCollector(1:end,:) * xCollector(1:end,:)'...
         / learnLength;
 
     allTrainxArgs = [allTrainxArgs, xCollector];
@@ -139,7 +136,7 @@ end
 
 %%% compute pattern readout
 Wout = (pinv(allTrainxArgs * allTrainxArgs' + ...
-    TychonovAlphaReadout * eye(Netsize + 1)) ...
+    TychonovAlphaReadout * eye(Netsize)) ...
     * allTrainxArgs * allTrainOuts')';
 % training error
 outsRecovered = Wout*allTrainxArgs;
@@ -189,16 +186,11 @@ for p = 1:nP
     
     for n = 1:CtestLength
         xOld = x;
-        if stateNL == 0
-            x = (1-LR)*xOld + LR * tanh(W *  x + Wbias);
-        else
-            x = (1-LR)*xOld + LR * tanh(W *  x + Wbias) ...
-                + stateNL * (rand(Netsize,1)-0.5);
-        end
+        x = (1-LR)*xOld + LR * tanh(W *  x + Wbias);
         
         x_CTestPLSingle(:,n,p) = x(1:10,1);
         x = C * x;
-        p_CTestPLSingle(:,n,p) = Wout * [x; 1]; % WTF, why append "1"?
+        p_CTestPLSingle(:,n,p) = Wout * x;
     end
 end
 

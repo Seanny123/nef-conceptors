@@ -1,7 +1,9 @@
 from utils import gen_w_rec, get_conceptors
+from tanh_neuron import TanhWithBias
 
 import nengo
 import nengo.solvers
+import nengolib
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,6 +17,7 @@ t_scale = 0.5
 t_period = 1.0
 t_len = t_period*t_scale
 n_neurons = 600  # same as Matlab
+#n_neurons = 100
 sig_dims = 1
 
 
@@ -54,15 +57,17 @@ pat_data = np.zeros((n_sigs, t_steps))
 init_x = np.zeros((n_sigs, n_neurons))
 
 w_rec = gen_w_rec(n_neurons)
+#neuron_type = TanhWithBias(seed=SEED)
+neuron_type = nengo.LIFRate()
 
 for i_s, sig in enumerate(sigs):
     # get the rate data
-    with nengo.Network() as rate_acc:
+    with nengolib.Network(seed=SEED) as rate_acc:
         in_sig = nengo.Node(sig)
-        sig_reserv = nengo.Ensemble(n_neurons, 1, neuron_type=nengo.LIFRate(), seed=SEED)
+        sig_reserv = nengo.Ensemble(n_neurons, sig_dims, neuron_type=neuron_type, seed=SEED)
 
-        nengo.Connection(sig_reserv.neurons, sig_reserv.neurons, transform=w_rec, synapse=0)
-        nengo.Connection(in_sig, sig_reserv, synapse=None)
+        nengo.Connection(sig_reserv.neurons, sig_reserv.neurons, transform=w_rec, synapse=0, seed=SEED)
+        nengo.Connection(in_sig, sig_reserv, synapse=None, seed=SEED)
         p_rate = nengo.Probe(sig_reserv.neurons, synapse=None)
         p_pat = nengo.Probe(in_sig)
 
@@ -105,20 +110,20 @@ def kick_func(t):
         return 0
 
 # use it for Conceptor testing
-with nengo.Network() as conc_model:
+with nengolib.Network(seed=SEED) as conc_model:
     kick = nengo.Node(kick_func)
-    reserv = nengo.Ensemble(n_neurons, 1, neuron_type=nengo.LIFRate(), seed=SEED)
+    reserv = nengo.Ensemble(n_neurons, sig_dims, neuron_type=neuron_type, seed=SEED)
     conc_node = nengo.Node(conc_func, size_in=n_neurons)
     output = nengo.Node(size_in=1)
     sanity = nengo.Node(get_idx)
 
     nengo.Connection(kick, reserv.neurons, synapse=None)
-    nengo.Connection(reserv.neurons, conc_node, transform=w_rec, synapse=0)
-    nengo.Connection(conc_node, reserv.neurons, synapse=None)
-    nengo.Connection(reserv.neurons, output, transform=w_out.T)
+    nengo.Connection(reserv.neurons, conc_node, transform=w_rec, synapse=0, seed=SEED)
+    nengo.Connection(conc_node, reserv.neurons, synapse=None, seed=SEED)
+    nengo.Connection(reserv.neurons, output, transform=w_out.T, synapse=None, seed=SEED)
 
     p_rate = nengo.Probe(reserv.neurons)
-    p_res = nengo.Probe(output)
+    p_res = nengo.Probe(output, synapse=0.02)
     p_kick = nengo.Probe(kick)
     p_conc = nengo.Probe(conc_node)
     p_san = nengo.Probe(sanity)

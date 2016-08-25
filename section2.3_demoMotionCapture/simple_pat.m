@@ -1,5 +1,3 @@
-addpath('./MoCapToolbox_v1.4/mocaptoolbox');
-addpath('./helpersMocap');
 addpath('../helpers');
 
 set(0,'DefaultFigureWindowStyle','docked');
@@ -99,6 +97,7 @@ allTrainOuts = zeros(pattDim, 0);
 Wtargets = zeros(Netsize,0);
 patternRs = cell(1,nP);
 startXs = zeros(Netsize, nP);
+filename = '';
 % collect data from driving native reservoir with different drivers
 for p = 1:nP
     patt = patts{p}; % current pattern
@@ -125,14 +124,18 @@ for p = 1:nP
         end
         uOld = u;
     end
-    patternRs{p} = xCollector(1:end,:) * xCollector(1:end,:)'...
-        / learnLength;
+    %filename = sprintf('patt%d.mat', p);
+    %save(filename, 'xCollector');
+    
+    patternRs{p} = xCollector * xCollector' / learnLength;
 
     allTrainxArgs = [allTrainxArgs, xCollector];
     allTrainOldxArgs = [allTrainOldxArgs, xOldCollector];
     allTrainOuts = [allTrainOuts, pCollector];
     allTrainWtargets = [allTrainWtargets, WTargetCollector];
 end
+
+%save('corrs', 'patternRs')
 
 %%% compute pattern readout
 Wout = (pinv(allTrainxArgs * allTrainxArgs' + ...
@@ -175,6 +178,7 @@ for p = 1:nP
     Cs{4, p} = diag(S);    
 end
 
+%save('conc_vals', 'Cs')
 %%% test 
 
 x_CTestPLSingle = zeros(10, CtestLength, nP);
@@ -182,15 +186,19 @@ p_CTestPLSingle = zeros(pattDim, CtestLength, nP);
 
 for p = 1:nP
     C = Cs{1, p};
-    x = startXs(:,p);    
+    x = startXs(:,p);
+    %x = startXs(:,p) + randn(size(startXs(:, 1)));
+    %x = tanh(startXs(:,p));
     
     for n = 1:CtestLength
-        xOld = x;
-        x = (1-LR)*xOld + LR * tanh(W *  x + Wbias);
+        x_rec = x;
+        xOld = C * x_rec;
+        x = (1-LR)*xOld + LR * tanh(W*xOld + Wbias);
+        p_CTestPLSingle(:,n,p) = Wout * x;
         
         x_CTestPLSingle(:,n,p) = x(1:10,1);
-        x = C * x;
-        p_CTestPLSingle(:,n,p) = Wout * x;
+        
+        
     end
 end
 

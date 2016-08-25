@@ -194,11 +194,9 @@ for p = 1:nP
         x_rec = x;
         xOld = C * x_rec;
         x = (1-LR)*xOld + LR * tanh(W*xOld + Wbias);
-        p_CTestPLSingle(:,n,p) = Wout * x;
         
         x_CTestPLSingle(:,n,p) = x(1:10,1);
-        
-        
+        p_CTestPLSingle(:,n,p) = Wout * x; 
     end
 end
 

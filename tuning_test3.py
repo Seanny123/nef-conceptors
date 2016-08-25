@@ -1,5 +1,6 @@
 from tanh_neuron import TanhWithBias
 
+import numpy as np
 import nengo
 import ipdb
 import matplotlib.pyplot as plt
@@ -11,9 +12,9 @@ sig_dims = 1
 
 
 with nengo.Network() as model:
-    in_nd = nengo.Node(lambda t: (1.0 - t))
+    in_nd = nengo.Node(lambda t: np.ones(n_neurons) * (1.0 - t))
     sig_reserv = nengo.Ensemble(n_neurons, sig_dims, neuron_type=neuron_type, seed=SEED)
-    nengo.Connection(in_nd, sig_reserv, synapse=None, seed=SEED)
+    nengo.Connection(in_nd, sig_reserv.neurons, synapse=None, seed=SEED)
 
     p_rate = nengo.Probe(sig_reserv.neurons, synapse=None)
     p_in = nengo.Probe(in_nd)

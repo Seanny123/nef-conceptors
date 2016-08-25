@@ -1,5 +1,7 @@
 import nengolib
 import numpy as np
+from nengo.builder import Builder, Operator, Signal
+from nengo.builder.neurons import SimNeurons
 
 
 class TanhWithBias(nengolib.neurons.Unit):
@@ -15,6 +17,19 @@ class TanhWithBias(nengolib.neurons.Unit):
         bias = 0.8 * 2 * (self.rng.randn(*max_rates.shape) - 0.5)
         return np.ones_like(max_rates), bias
 
-    def step_math(self, dt, J, output):
+    def step_math(self, dt, J, output, last_rate):
         """Compute rates in Hz for input current (incl. bias)"""
-        output[...] = 0.6 * np.tanh(J)
+        output[...] = (1 - self.leak_rate) * last_rate + self.leak_rate * np.tanh(J)
+        last_rate = output
+
+
+@Builder.register(TanhWithBias)
+def build_tanhwithbias(model, tanhwithbias, neurons):
+    """acquire the last_rate argument"""
+
+    model.sig[neurons]['last_rate'] = Signal(
+        np.zeros(neurons.size_in), name="%s.last_rate" % neurons)
+    model.add_op(SimNeurons(neurons=tanhwithbias,
+                            J=model.sig[neurons]['in'],
+                            output=model.sig[neurons]['out'],
+                            states=[model.sig[neurons]['last_rate']]))

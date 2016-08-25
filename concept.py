@@ -1,4 +1,4 @@
-from utils import gen_w_rec, get_conceptors
+from utils import gen_w_rec, get_conceptors, get_w_out
 from tanh_neuron import TanhWithBias
 
 import nengo
@@ -17,8 +17,8 @@ t_scale = 0.5
 t_period = 1.0
 t_len = t_period*t_scale
 n_neurons = 600  # same as Matlab
-#n_neurons = 100
 sig_dims = 1
+wash = 50
 
 
 def conv_t(t):
@@ -46,50 +46,48 @@ cos_per = (2 * np.pi * 20) / t_len
 sigs = [
     lambda t: np.sin(sin_per*t),
     lambda t: 0.5*np.cos(cos_per*t),
-    #lambda t: funky_sig(t)
 ]
 
 n_sigs = len(sigs)
 apert = np.ones(n_sigs) * 10
 
-rate_data = np.zeros((n_sigs, t_steps, n_neurons))
-pat_data = np.zeros((n_sigs, t_steps))
+rate_data = np.zeros((n_sigs, t_steps-wash, n_neurons))
+pat_data = np.zeros((n_sigs, t_steps-wash))
 init_x = np.zeros((n_sigs, n_neurons))
 
 w_rec = gen_w_rec(n_neurons)
-#neuron_type = TanhWithBias(seed=SEED)
-neuron_type = nengo.LIFRate()
+neuron_type = TanhWithBias(seed=SEED)
+#neuron_type = nengo.LIFRate()
+
 
 for i_s, sig in enumerate(sigs):
     # get the rate data
-    with nengolib.Network(seed=SEED) as rate_acc:
+    with nengo.Network() as rate_acc:
         in_sig = nengo.Node(sig)
         sig_reserv = nengo.Ensemble(n_neurons, sig_dims, neuron_type=neuron_type, seed=SEED)
 
-        nengo.Connection(sig_reserv.neurons, sig_reserv.neurons, transform=w_rec, synapse=0, seed=SEED)
-        nengo.Connection(in_sig, sig_reserv, synapse=None, seed=SEED)
+        nengo.Connection(sig_reserv.neurons, sig_reserv.neurons, transform=w_rec, synapse=0)
+        nengo.Connection(in_sig, sig_reserv, synapse=None)
         p_rate = nengo.Probe(sig_reserv.neurons, synapse=None)
         p_pat = nengo.Probe(in_sig)
 
     with nengo.Simulator(rate_acc) as rate_sim:
         rate_sim.run(t_len*2)
 
-    rate_data[i_s] = rate_sim.data[p_rate][t_steps:]
-    init_x[i_s] = rate_sim.data[p_rate][t_steps]
-    pat_data[i_s] = rate_sim.data[p_pat][t_steps:, sig_dims-1]
+    rate_data[i_s] = rate_sim.data[p_rate][t_steps+wash:]
+    init_x[i_s] = rate_sim.data[p_rate][t_steps+wash]
+    pat_data[i_s] = rate_sim.data[p_pat][t_steps+wash:, sig_dims-1]
 
-# get the output weights using the usual decoder math
-# previously verified by decoding original activities
-solver = nengo.solvers.LstsqL2(reg=0.02)
-w_out, d_info = solver(
-    rate_data.reshape((t_steps*n_sigs, -1)),
-    pat_data.reshape((t_steps*n_sigs, -1)),
+w_out = get_w_out(rate_data.reshape(((t_steps-wash)*n_sigs, -1)).T, pat_data.reshape(((t_steps-wash)*n_sigs, -1)).T,
+                  n_neurons=n_neurons)
 
-)
+# demonstrates how w_out is functional
+#plt.plot(np.dot(rate_data.reshape(((t_steps-wash)*n_sigs, -1)), w_out))
+#plt.show()
 
 # do SVD on the neuron data to get Conceptors
 # slowest part of the process and appears to only be using one core
-conceptors = get_conceptors(rate_data, n_sigs, t_steps, apert, n_neurons)
+conceptors = get_conceptors(rate_data, n_sigs, t_steps-wash, apert, n_neurons)
 
 
 def get_idx(t):
@@ -110,23 +108,21 @@ def kick_func(t):
         return 0
 
 # use it for Conceptor testing
-with nengolib.Network(seed=SEED) as conc_model:
+with nengo.Network() as conc_model:
     kick = nengo.Node(kick_func)
     reserv = nengo.Ensemble(n_neurons, sig_dims, neuron_type=neuron_type, seed=SEED)
     conc_node = nengo.Node(conc_func, size_in=n_neurons)
     output = nengo.Node(size_in=1)
-    sanity = nengo.Node(get_idx)
 
     nengo.Connection(kick, reserv.neurons, synapse=None)
-    nengo.Connection(reserv.neurons, conc_node, transform=w_rec, synapse=0, seed=SEED)
-    nengo.Connection(conc_node, reserv.neurons, synapse=None, seed=SEED)
-    nengo.Connection(reserv.neurons, output, transform=w_out.T, synapse=None, seed=SEED)
+    nengo.Connection(reserv.neurons, conc_node, synapse=None)
+    nengo.Connection(conc_node, reserv.neurons, transform=w_rec, synapse=0)
+    nengo.Connection(reserv.neurons, output, transform=w_out.T, synapse=None)
 
     p_rate = nengo.Probe(reserv.neurons)
-    p_res = nengo.Probe(output, synapse=0.02)
+    p_res = nengo.Probe(output, synapse=0.01)
     p_kick = nengo.Probe(kick)
     p_conc = nengo.Probe(conc_node)
-    p_san = nengo.Probe(sanity)
 
 with nengo.Simulator(conc_model) as conc_sim:
     conc_sim.run(t_len*n_sigs)

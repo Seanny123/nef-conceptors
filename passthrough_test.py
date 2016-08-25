@@ -1,4 +1,4 @@
-from utils import gen_w_rec, get_w_out, nrmse
+from utils import gen_w_rec, get_w_out
 
 import nengo
 import nengo.solvers
@@ -23,20 +23,6 @@ def conv_t(t):
     return t % t_len
 
 
-def funky_sig(t):
-    """rise with three different linear slopes"""
-    t_step = conv_t(t)
-
-    # getting a weird signal could have been done way more efficiently...
-    if t_step < 0.3 * t_scale:
-        return t_step
-    elif 0.3*t_scale <= t_step < 0.6*t_scale:
-        return t_step * 0.3
-    elif 0.6 * t_scale <= t_step:
-        return t_step * 1.3
-    else:
-        return 0
-
 t_steps = int(t_len / dt)
 
 sin_per = (2 * np.pi * 10) / t_len
@@ -59,12 +45,12 @@ neuron_type = TanhWithBias(seed=SEED)
 
 for i_s, sig in enumerate(sigs):
     # get the rate data
-    with nengo.Network(seed=SEED) as rate_acc:
+    with nengo.Network() as rate_acc:
         in_sig = nengo.Node(sig)
         sig_reserv = nengo.Ensemble(n_neurons, sig_dims, neuron_type=neuron_type, seed=SEED)
 
-        nengo.Connection(sig_reserv.neurons, sig_reserv.neurons, transform=w_rec, synapse=0, seed=SEED)
-        nengo.Connection(in_sig, sig_reserv, synapse=None, seed=SEED)
+        nengo.Connection(sig_reserv.neurons, sig_reserv.neurons, transform=w_rec, synapse=0)
+        nengo.Connection(in_sig, sig_reserv, synapse=None)
         p_rate = nengo.Probe(sig_reserv.neurons, synapse=None)
         p_pat = nengo.Probe(in_sig)
 
@@ -80,21 +66,24 @@ pat_data = pat_data.reshape((t_steps*n_sigs, -1))
 
 w_out = get_w_out(rate_data.T, pat_data.T, n_neurons=n_neurons)
 
-print("NRMSE: %s" % np.mean(nrmse(rate_data.T, pat_data.T)))
 plt.plot(np.dot(rate_data, w_out))
 plt.show()
 
+
+def conc_func(t, x):
+    return t*0 + 1*x
+
 # use it for Conceptor testing
-with nengo.Network(seed=SEED) as conc_model:
+with nengo.Network() as conc_model:
     in_sig = nengo.Node(sig)
     reserv = nengo.Ensemble(n_neurons, sig_dims, neuron_type=neuron_type, seed=SEED)
-    conc_node = nengo.Node(size_in=n_neurons)
+    conc_node = nengo.Node(conc_func, size_in=n_neurons)
     output = nengo.Node(size_in=sig_dims)
 
     nengo.Connection(in_sig, reserv, synapse=None)
-    nengo.Connection(reserv.neurons, conc_node, transform=w_rec, synapse=0, seed=SEED)
-    nengo.Connection(conc_node, reserv.neurons, synapse=None, seed=SEED)
-    nengo.Connection(reserv.neurons, output, transform=w_out.T, synapse=None, seed=SEED)
+    nengo.Connection(reserv.neurons, conc_node, transform=w_rec, synapse=0)
+    nengo.Connection(conc_node, reserv.neurons, synapse=None)
+    nengo.Connection(reserv.neurons, output, transform=w_out.T, synapse=None)
 
     p_res = nengo.Probe(output, synapse=0.01)
 

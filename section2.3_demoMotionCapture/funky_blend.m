@@ -48,7 +48,16 @@ pattTransitions = 100 * ones(1, length(pattOrder)-1);
 sinPer = (2 * pi * 10) / tMax;
 cosPer = (2 * pi * 20) / tMax;
 p1 = sin(tSteps*sinPer)';
-p2 = 0.5*cos(tSteps*cosPer)';
+p2 = zeros(tLen, 1);
+
+tmp_x = 0;
+tmp_count = 1;
+for t = tSteps
+   p2(tmp_count) = so_funky(t);
+   tmp_count = tmp_count + 1;
+end
+
+plot(p2);
 
 % pattern durations
 pl1 = size(p1,1); pl2 = size(p2,1);

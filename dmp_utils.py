@@ -1,5 +1,4 @@
 import numpy as np
-import scipy
 from scipy import interpolate
 import nengo
 import ipdb
@@ -9,7 +8,10 @@ import matplotlib.pyplot as plt
 def gen_forcing_functions(y_des, dt=.001, alpha=10, beta=10/4., num_samples=10):
         
         # scale our trajectory and find the center point
-        y_des = y_des.T / 1e5 #s this is the speed control that decides what units everything should be in and how fast the action runs
+
+        # speed control that decides what units everything should be in and how fast the action runs
+        y_des = y_des.T / 1e5
+        # center of point attractor
         goal = np.sum(y_des, axis=1) / y_des.shape[1]
 
         # interpolate our desired trajectory to smooth out the sampling
@@ -66,6 +68,7 @@ def gen_forcing_functions(y_des, dt=.001, alpha=10, beta=10/4., num_samples=10):
                                     interpolate.interp1d(np.linspace(-np.pi, np.pi, num_samples), force)(x))
         return forcing_functions
 
+
 def gen_point_attractor(model, in_goal, n_neurons=200, alpha=10, beta=10/4.):
     # create an ensemble with point attractor dynamics
     with model: 
@@ -75,15 +78,14 @@ def gen_point_attractor(model, in_goal, n_neurons=200, alpha=10, beta=10/4.):
         # specify the rate of change of each dimension represented.
         # first row of the transform is dyz, second row is ddyz
         nengo.Connection(yz, yz, 
-                         transform=np.eye(2) + \
-                                      np.array([[0, 1],
-                                                [-alpha*beta, -alpha]]),
+                         transform=np.eye(2) + np.array([[0, 1], [-alpha*beta, -alpha]]),
                          synapse=1)
         # connect up the input signal
         nengo.Connection(in_goal, yz[1],
                          transform=[[alpha*beta]],
                          synapse=1)
         return yz
+
 
 def force(x, function, gain=1):
     # calculate the angle theta

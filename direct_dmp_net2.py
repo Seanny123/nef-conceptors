@@ -4,9 +4,9 @@ import numpy as np
 from constants import *
 
 
-def get_direct_decoders(target_func, period, arg_osc, bump_func, n_neurons=100, seed=0, label=None):
+def get_direct_decoders(target_func, period, arg_osc, bump_func):
 
-    with nengo.Network(label=label) as train_net:
+    with nengo.Network() as train_net:
         bump = nengo.Node(bump_func)
         osc = arg_osc.copy()
         nengo.Connection(bump, osc.ensemble[0])
@@ -22,5 +22,3 @@ def get_direct_decoders(target_func, period, arg_osc, bump_func, n_neurons=100, 
     decoders, info = solver(sim_train.data[p_neur][start:end], target_func(np.arange(0, (end-start)*dt, dt))[:, None])
 
     return decoders
-
-

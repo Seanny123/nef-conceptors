@@ -1,22 +1,27 @@
-import nengo
-import numpy as np
-from nengo.utils.connection import target_function
-
-from constants import *
+from dmp_utils import *
 
 
-def make_attrac_net(target_func, period, n_neurons=100, seed=0, label=None):
-
-    t_val = np.arange(0, period, dt)
+def make_attrac_net(target_func, n_neurons=500, dd=None, seed=0, label=None):
 
     with nengo.Network(label=label) as ad_net:
+
         ad_net.input = nengo.Node(size_in=1)
-        # ideally this should be using a config object
-        readout = nengo.Ensemble(n_neurons=n_neurons, dimensions=2, neuron_type=nengo.LIFRate(), seed=seed)
-        nengo.Connection(ad_net.input, readout, synapse=None)
-
         ad_net.output = nengo.Node(size_in=1)
-        nengo.Connection(readout, ad_net.output,
-                         **target_function(np.array([np.cos(t_val), np.sin(t_val)]).T, target_func(t_val)))
+        goal = nengo.Node([0])
 
-    return ad_net
+        attractor = gen_point_attractor(ad_net, goal, n_neurons=n_neurons, seed=seed)
+        nengo.Connection(attractor[0], ad_net.output, synapse=None)
+
+        dest = target_func(np.linspace(-np.pi, np.pi, 100)).reshape((-1, 1))
+        force_func = gen_forcing_functions(dest, num_samples=90)[0]
+
+        if dd is not None:
+            def conn_func(x, dec=dd, ff=force_func):
+                return force_theta(x, dec, ff)
+        else:
+            def conn_func(x, ff=force_func):
+                return force(x, ff)
+
+        nengo.Connection(ad_net.input, attractor[1], synapse=None)
+
+    return ad_net, conn_func

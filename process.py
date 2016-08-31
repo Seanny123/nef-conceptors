@@ -27,6 +27,7 @@ def d3_scale(dat, out_range=(-1, 1), in_range=None):
 
     return interp(uninterp(dat))
 
+
 def pre(output_dims, pattern_file_names):
     min_maxs = np.zeros((output_dims, 2))
     min_maxs[:, 0] = np.inf
@@ -68,7 +69,8 @@ def pre(output_dims, pattern_file_names):
             assert np.max(normed_data) <= 1.5
             assert np.min(normed_data) >= -1.5
             function_list[-1].append(interpolate.interp1d(xv, normed_data[o_i, :]))
-    return (function_list, min_maxs)
+    return function_list, min_maxs
+
 
 def post(sim, p_out, min_maxs, final_only=True):
     tmp_out = sim.data[p_out]
@@ -83,13 +85,14 @@ def post(sim, p_out, min_maxs, final_only=True):
         # additional filtering for reg_out to stop the crazy jitters
         tmp_scaled = d3_scale(tmp_out[:, t_i], out_range=min_maxs[t_i],
                               in_range=(reg_min, reg_max))
-        print("Iinitial min: %s Initial max: %s" %(reg_min, reg_max))
+        print("Initial min: %s Initial max: %s" %(reg_min, reg_max))
         print("Scaled min: %s Scaled max: %s" %(np.min(tmp_scaled), np.max(tmp_scaled)))
         print("Intended min: %s Intended max %s" %(min_maxs[t_i][0], min_maxs[t_i][1]))
 
         good_start = 1000
         total_len = tmp_scaled.shape[0] - good_start
-        # this doesn't do a perfect translation, because some actions are longer/shorter than others, but that doesn't really matter in the end
+        # this doesn't do a perfect translation, because some actions are longer/shorter than others
+        # but that doesn't really matter in the end
         signal_len = 291
         sample_interval = int( total_len / signal_len)
         re_size = good_start + total_len % sample_interval
@@ -108,7 +111,6 @@ def post(sim, p_out, min_maxs, final_only=True):
         if not final_only:
             out_scaled[:, t_i] = tmp_scaled
             reg_out[:, t_i] = nengo.Lowpass(0.1).filt(tmp_scaled, dt=0.001)
-
 
     # try running the patterns in Matlab to see if they're legit
     if not final_only:

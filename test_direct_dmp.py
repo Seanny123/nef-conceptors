@@ -1,4 +1,3 @@
-# make sure it runs and represents signals well
 import nengo
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,7 +24,7 @@ with nengo.Network() as dd_model:
 
     output = nengo.Node(size_in=1)
 
-    dd = get_direct_decoders(target_func, period, osc, bump_func, 300)
+    dd = get_direct_decoders(target_func, period, osc, bump_func)
 
     bump = nengo.Node(bump_func)
     nengo.Connection(bump, osc.ensemble[0])

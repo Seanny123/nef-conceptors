@@ -1,4 +1,5 @@
 import numpy as np
+import scipy
 import matplotlib.pyplot as plt
 import ipdb
 
@@ -24,7 +25,7 @@ def d3_scale(dat, out_range=(-1, 1), in_range=None):
 
 
 def gen_w_rec(n_neurons):
-    w_rec = np.random.randn(n_neurons, n_neurons)
+    w_rec = scipy.sparse.random(n_neurons, n_neurons, density=10/n_neurons).A
     w_rec /= np.max(np.abs(np.linalg.eigvals(w_rec)))
     print("max weight:%s" % np.max(w_rec))
     return w_rec

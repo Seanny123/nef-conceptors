@@ -3,9 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from direct_dmp_net2 import get_direct_decoders
+from constants import *
 
 period = 0.5
-sin_per = (2 * np.pi * 10)
+sin_per = (2 * np.pi * 20)
 
 
 def target_func(t):
@@ -20,7 +21,7 @@ with nengo.Network() as dd_model:
     osc = nengo.Network()
     osc.config[nengo.Ensemble].neuron_type = nengo.LIFRate()
     osc.config[nengo.Ensemble].seed = 0
-    nengo.networks.Oscillator(0.1, 2*np.pi/period, 300, net=osc)
+    nengo.networks.Oscillator(0.1, 2*np.pi, 300, net=osc)
 
     output = nengo.Node(size_in=1)
 

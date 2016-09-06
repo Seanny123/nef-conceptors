@@ -1,4 +1,4 @@
-from utils import gen_w_rec, get_conceptors, get_w_out
+from utils import gen_w_rec, get_conceptors, get_w
 from tanh_neuron import TanhWithBias
 
 import nengo
@@ -56,6 +56,10 @@ pat_data = np.zeros((n_sigs, t_steps-wash))
 init_x = np.zeros((n_sigs, n_neurons))
 
 w_rec = gen_w_rec(n_neurons)
+# ideally should be replaced with a uniform hypersphere
+w_in = 2 * (np.random.randn(n_neurons, sig_dims) - 0.5)
+
+
 neuron_type = TanhWithBias(seed=SEED)
 #neuron_type = nengo.LIFRate()
 
@@ -67,7 +71,7 @@ for i_s, sig in enumerate(sigs):
         sig_reserv = nengo.Ensemble(n_neurons, sig_dims, neuron_type=neuron_type, seed=SEED)
 
         nengo.Connection(sig_reserv.neurons, sig_reserv.neurons, transform=w_rec, synapse=0)
-        nengo.Connection(in_sig, sig_reserv, synapse=None)
+        nengo.Connection(in_sig, sig_reserv.neurons, synapse=None, transform=w_in)
         p_rate = nengo.Probe(sig_reserv.neurons, synapse=None)
         p_pat = nengo.Probe(in_sig)
 
@@ -78,12 +82,17 @@ for i_s, sig in enumerate(sigs):
     init_x[i_s] = rate_sim.data[p_rate][t_steps+wash]
     pat_data[i_s] = rate_sim.data[p_pat][t_steps+wash:, sig_dims-1]
 
-w_out = get_w_out(rate_data.reshape(((t_steps-wash)*n_sigs, -1)).T, pat_data.reshape(((t_steps-wash)*n_sigs, -1)).T,
-                  n_neurons=n_neurons)
+x_val = rate_data.reshape(((t_steps-wash)*n_sigs, -1)).T
+sig_val = pat_data.reshape(((t_steps-wash)*n_sigs, -1)).T
+w_out = get_w(x_val, sig_val, n_neurons=n_neurons)
 
 # demonstrates how w_out is functional
 #plt.plot(np.dot(rate_data.reshape(((t_steps-wash)*n_sigs, -1)), w_out))
 #plt.show()
+
+x_val_old = x_val[:, 1:]
+w_targ = np.dot(w_in, sig_val[:, 1:]) + np.dot(w_rec, x_val_old)
+opt_w_rec = get_w(x_val_old, w_targ, n_neurons=n_neurons)
 
 # do SVD on the neuron data to get Conceptors
 # slowest part of the process and appears to only be using one core
@@ -116,7 +125,7 @@ with nengo.Network() as conc_model:
 
     nengo.Connection(kick, reserv.neurons, synapse=None)
     nengo.Connection(reserv.neurons, conc_node, synapse=None)
-    nengo.Connection(conc_node, reserv.neurons, transform=w_rec, synapse=0)
+    nengo.Connection(conc_node, reserv.neurons, transform=opt_w_rec, synapse=0)
     nengo.Connection(reserv.neurons, output, transform=w_out.T, synapse=None)
 
     p_rate = nengo.Probe(reserv.neurons)

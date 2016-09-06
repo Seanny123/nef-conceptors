@@ -6,10 +6,11 @@ from scipy import interpolate
 
 # TODO: remove "d3_scale" and "pre", then rename the file to postprocess
 
+
 def d3_scale(dat, out_range=(-1, 1), in_range=None):
     """scale function for mapping from one range to another stolen from D3.js"""
 
-    if in_range == None:
+    if in_range is None:
         domain = [np.min(dat, axis=0), np.max(dat, axis=0)]
     else:
         domain = in_range
@@ -22,7 +23,7 @@ def d3_scale(dat, out_range=(-1, 1), in_range=None):
         if (domain[1] - domain[0]) != 0:
             b = domain[1] - domain[0]
         else:
-            b =  1.0 / domain[1]
+            b = 1.0 / domain[1]
         return (x - domain[0]) / b
 
     return interp(uninterp(dat))

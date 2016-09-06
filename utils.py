@@ -25,13 +25,14 @@ def d3_scale(dat, out_range=(-1, 1), in_range=None):
 
 
 def gen_w_rec(n_neurons):
-    w_rec = scipy.sparse.random(n_neurons, n_neurons, density=10/n_neurons).A
+    #w_rec = scipy.sparse.random(n_neurons, n_neurons, density=10/n_neurons).A
+    w_rec = np.random.randn(n_neurons, n_neurons)
     w_rec /= np.max(np.abs(np.linalg.eigvals(w_rec)))
     print("max weight:%s" % np.max(w_rec))
     return w_rec
 
 
-def get_w_out(rate_data, target, n_neurons=1, reg=0):
+def get_w(rate_data, target, n_neurons=1, reg=0):
     """The solution method from the Matlab implementation"""
     return np.dot(
         np.dot(np.linalg.pinv(np.dot(rate_data, rate_data.T) + reg * np.eye(n_neurons)), rate_data),
@@ -39,6 +40,8 @@ def get_w_out(rate_data, target, n_neurons=1, reg=0):
 
 
 def get_conceptors(rate_data, n_sigs, t_steps, apert, n_neurons):
+    """this is nearly identical to
+     https://github.com/nengo/nengo/blob/master/nengo/utils/least_squares_solvers.py#L250"""
     conceptors = []
     for i_s in range(n_sigs):
         r_dat = rate_data[i_s]

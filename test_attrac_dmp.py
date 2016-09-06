@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 from scipy import interpolate
 
 from attractor_dmp_net import make_attrac_net
-from direct_dmp_net2 import get_direct_decoders
 from constants import *
+from process import d3_scale
 
 period = 0.5
 sin_per = (2 * np.pi * 10)
@@ -40,5 +40,7 @@ with nengo.Network() as ad_model:
 with nengo.Simulator(ad_model) as ad_sim:
     ad_sim.run(4*period)
 
-plt.plot(ad_sim.data[p_out][int(2*period/dt):])
+g_dat = ad_sim.data[p_out][int(2*period/dt):]
+plt.plot(d3_scale(g_dat))
 plt.show()
+

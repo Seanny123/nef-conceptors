@@ -97,6 +97,7 @@ res = scalar_blend(sin_targ, cos_targ)
 
 plt.plot(res[0][int(2*period/dt):])
 plt.plot(res[1][int(2*period/dt):])
+plt.plot(res[3][int(2*period/dt):])
 plt.show()
 
 plt.plot(res[2][int(2*period/dt):])

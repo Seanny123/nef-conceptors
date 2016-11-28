@@ -1,7 +1,7 @@
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
-import ipdb
+#import ipdb
 
 
 def d3_scale(dat, out_range=(-1, 1), in_range=None):

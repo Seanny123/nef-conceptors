@@ -5,7 +5,7 @@ from nengo.builder.neurons import SimNeurons
 
 
 class TanhWithBias(nengolib.neurons.Unit):
-    """A rectified linear neuron model."""
+    """TanH neuron model with memory."""
 
     def __init__(self, seed=0, leak_rate=0.6):
         super(TanhWithBias, self).__init__()

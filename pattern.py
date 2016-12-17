@@ -64,7 +64,7 @@ pattern_file_names = (
 )
 
 # max is 61, but 14 is a nice leg
-output_dims = 61
+output_dims = 2
 pattern_num = 1
 pattern_file_names = pattern_file_names[:pattern_num]
 
@@ -117,7 +117,7 @@ with model:
     # each ensemble array has the output dimensions
     # combine ensemble arrays to combine patterns
     # BONUS: figure out how to combine individual dimensions, once I know what they actually mean...
-    # SUPER BONUS: use visual assement for the robot to be able to imitate a movement
+    # SUPER BONUS: use visual assessment for the robot to be able to imitate a movement
     # ASIDE: which would be cool, because then maybe the robot could infer properties of objects from movement
 
     ea_n_neurons = 300
@@ -128,6 +128,7 @@ with model:
         n = make_dmp_net(function_list[n_i], osc[:2], output.input, name=name)
         dmp_net_list.append(n)
 
+    # learn to decode arctan in a non-shitty manner
     # Helper nodes for verification
     arctan = nengo.Node(size_in=1)
     nengo.Connection(osc[:2], arctan, function=lambda x: np.arctan2(x[0], x[1]), synapse=None)

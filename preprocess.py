@@ -1,4 +1,3 @@
-
 import numpy as np
 import scipy.io
 from scipy import interpolate
@@ -6,22 +5,23 @@ from scipy import interpolate
 from utils import d3_scale
 
 pattern_file_names = (
-     "nnRawExaStride",
-     "nnRawSlowWalk",
-     "nnRawWalk",
-     "nnRawRunJog",
-     "nnRawCartWheel",
-     "nnRawWaltz",
-     "nnRawCrawl",
-     "nnRawStandup",
-     "nnRawGetdown",
-     "nnRawSitting",
-     "nnRawGetSeated",
-     "nnRawStandupFromStool",
-     "nnRawBox1",
-     "nnRawBox2",
-     "nnRawBox3",
+    "nnRawExaStride",
+    "nnRawSlowWalk",
+    "nnRawWalk",
+    "nnRawRunJog",
+    "nnRawCartWheel",
+    "nnRawWaltz",
+    "nnRawCrawl",
+    "nnRawStandup",
+    "nnRawGetdown",
+    "nnRawSitting",
+    "nnRawGetSeated",
+    "nnRawStandupFromStool",
+    "nnRawBox1",
+    "nnRawBox2",
+    "nnRawBox3",
 )
+
 
 def preprocess(output_dims, pattern_num, save_res=False):
     """load the patterns from matlab and save the results"""
@@ -37,7 +37,7 @@ def preprocess(output_dims, pattern_num, save_res=False):
     # get the actual maximum and minimums for each dimension
     for nm in ptrn_file_names:
         name = nm[5:]
-        raw_dats.append(scipy.io.loadmat("section2.3_demoMotionCapture/nnData/%s.mat" %(nm))["nnRawData"+name].T)
+        raw_dats.append(scipy.io.loadmat("section2.3_demoMotionCapture/nnData/%s.mat" % (nm))["nnRawData" + name].T)
         for o_i in range(output_dims):
             assert raw_dats[-1][o_i].shape != (61,)
             min_val = np.min(raw_dats[-1][o_i])
@@ -52,12 +52,12 @@ def preprocess(output_dims, pattern_num, save_res=False):
         # make each pattern values normalised between -1, 1
         # and temporally squash them between -pi and pi too
         raw_dat = raw_dats[n_i]
-        #assert raw_dat.shape[0] == output_dims
+        # assert raw_dat.shape[0] == output_dims
         normed_data = np.zeros_like(raw_dat)
 
         for o_i in range(output_dims):
-            assert min_maxs[o_i][0] <= np.min(raw_dat[o_i, :]) 
-            assert min_maxs[o_i][1] >= np.max(raw_dat[o_i, :]) 
+            assert min_maxs[o_i][0] <= np.min(raw_dat[o_i, :])
+            assert min_maxs[o_i][1] >= np.max(raw_dat[o_i, :])
             normed_data[o_i, :] = d3_scale(raw_dat[o_i, :], in_range=min_maxs[o_i])
             assert np.max(normed_data) <= 1.5
             assert np.min(normed_data) >= -1.5
@@ -68,10 +68,10 @@ def preprocess(output_dims, pattern_num, save_res=False):
 
     # save the result (min_maxs, normed_data)
     if save_res:
-        np.savez("processed/out_%s_pn_%s.npz" %(output_dims, pattern_num),
-            min_maxs=min_maxs, **final_normed)
+        np.savez("processed/out_%s_pn_%s.npz" % (output_dims, pattern_num),
+                 min_maxs=min_maxs, **final_normed)
 
-    return (min_maxs, final_normed)
+    return min_maxs, final_normed
 
 
 def get_function_list(output_dims, pattern_num, filename="", trange=(-np.pi, np.pi)):

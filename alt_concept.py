@@ -1,4 +1,4 @@
-from utils import gen_w_rec, get_conceptors, get_w
+from utils import gen_w_rec, get_conceptors_w_solver, get_w
 from tanh_neuron import TanhWithBias
 
 import nengo
@@ -59,13 +59,11 @@ pat_data = np.zeros((n_sigs, t_steps-wash))
 init_x = np.zeros((n_sigs, n_neurons))
 
 w_rec = gen_w_rec(n_neurons)
-# ideally should be replaced with a uniform hypersphere
-w_in = 2 * (np.random.randn(n_neurons, sig_dims) - 0.5)
-
+enc_dist = nengo.dists.UniformHypersphere(surface=True)
+encoders = enc_dist.sample(n_neurons, sig_dims)
 
 neuron_type = TanhWithBias(seed=SEED)
 #neuron_type = nengo.LIFRate()
-
 
 for i_s, sig in enumerate(sigs):
     # get the rate data
@@ -73,10 +71,10 @@ for i_s, sig in enumerate(sigs):
         in_sig = nengo.Node(sig)
         w_targ_out = nengo.Node(size_in=n_neurons)
         sig_reserv = nengo.Ensemble(n_neurons, sig_dims,
-                                    neuron_type=neuron_type, seed=SEED)
+                                    neuron_type=neuron_type,
+                                    encoders=encoders, seed=SEED)
 
-        nengo.Connection(in_sig, sig_reserv.neurons,
-                         transform=w_in, synapse=0)
+        nengo.Connection(in_sig, sig_reserv, synapse=0)
         nengo.Connection(sig_reserv.neurons, sig_reserv.neurons,
                          transform=w_rec, synapse=0)
         nengo.Connection(sig_reserv.neurons, w_targ_out, transform=w_rec, synapse=None)
@@ -100,17 +98,18 @@ x_val = rate_data.reshape(((t_steps-wash)*n_sigs, -1)).T
 sig_val = pat_data.reshape(((t_steps-wash)*n_sigs, -1)).T
 w_targ = w_targ_data.reshape(((t_steps-wash)*n_sigs, -1)).T
 
-w_out = get_w(x_val, sig_val, n_neurons=n_neurons)
+solver = nengo.solvers.LstsqL2(reg=0.02)
+w_out = solver(x_val.T, sig_val.T)[0]
 
 # demonstrates how w_out is functional
 #plt.plot(np.dot(rate_data.reshape(((t_steps-wash)*n_sigs, -1)), w_out))
 #plt.show()
 
-opt_w_rec = get_w(old_x_val, w_targ, n_neurons=n_neurons)
+opt_w_rec = solver(old_x_val.T, w_targ.T)[0]
 
 # do SVD on the neuron data to get Conceptors
 # slowest part of the process and appears to only be using one core
-conceptors = get_conceptors(rate_data, n_sigs, t_steps-wash, apert, n_neurons)
+conceptors = get_conceptors_w_solver(rate_data, sig_val, apert)
 
 
 def get_idx(t):
@@ -122,6 +121,7 @@ def conc_func(t, x):
     return np.dot(conceptors[get_idx(t)], x)
 
 
+# this doesn't actually matter
 def kick_func(t):
     """initialise the neurons"""
     tt = conv_t(t)
@@ -133,13 +133,15 @@ def kick_func(t):
 # use it for Conceptor testing
 with nengo.Network() as conc_model:
     kick = nengo.Node(kick_func)
-    reserv = nengo.Ensemble(n_neurons, sig_dims, neuron_type=neuron_type, seed=SEED)
+    reserv = nengo.Ensemble(n_neurons, sig_dims, neuron_type=neuron_type,
+                            encoders=encoders, seed=SEED)
     conc_node = nengo.Node(conc_func, size_in=n_neurons)
     output = nengo.Node(size_in=1)
 
     nengo.Connection(kick, reserv.neurons, synapse=None)
-    nengo.Connection(reserv.neurons, conc_node, synapse=None)
-    nengo.Connection(conc_node, reserv.neurons, transform=opt_w_rec, synapse=0)
+    nengo.Connection(reserv.neurons, conc_node,
+                     transform=opt_w_rec, synapse=None)
+    nengo.Connection(conc_node, reserv, synapse=0)
     nengo.Connection(reserv.neurons, output, transform=w_out.T, synapse=None)
 
     p_rate = nengo.Probe(reserv.neurons)

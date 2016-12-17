@@ -69,7 +69,7 @@ for i_s, sig in enumerate(sigs):
     # get the rate data
     with nengo.Network() as rate_acc:
         in_sig = nengo.Node(sig)
-        w_targ = nengo.Node(size_in=n_neurons)
+        w_targ_out = nengo.Node(size_in=n_neurons)
         sig_reserv = nengo.Ensemble(n_neurons, sig_dims,
                                     neuron_type=neuron_type,
                                     encoders=encoders, seed=SEED)
@@ -77,9 +77,9 @@ for i_s, sig in enumerate(sigs):
         nengo.Connection(in_sig, sig_reserv, synapse=0)
         nengo.Connection(sig_reserv.neurons, sig_reserv.neurons,
                          transform=w_rec, synapse=0)
-        nengo.Connection(sig_reserv.neurons, w_targ, transform=w_rec, synapse=None)
+        nengo.Connection(sig_reserv.neurons, w_targ_out, transform=w_rec, synapse=None)
 
-        p_w_targ = nengo.Probe(w_targ, synapse=None)
+        p_w_targ = nengo.Probe(w_targ_out, synapse=None)
         p_rate = nengo.Probe(sig_reserv.neurons, synapse=None)
         p_pat = nengo.Probe(in_sig)
 
@@ -89,8 +89,9 @@ for i_s, sig in enumerate(sigs):
     rate_data[i_s] = rate_sim.data[p_rate][t_steps+wash:]
     old_rate_data[i_s] = rate_sim.data[p_rate][t_steps+wash-1:-1]
     w_targ_data[i_s] = rate_sim.data[p_w_targ][t_steps+wash:]
-    init_x[i_s] = rate_sim.data[p_rate][t_steps+wash]
     pat_data[i_s] = rate_sim.data[p_pat][t_steps+wash:, sig_dims-1]
+
+    init_x[i_s] = rate_sim.data[p_rate][t_steps+wash]
 
 old_x_val = old_rate_data.reshape(((t_steps-wash)*n_sigs, -1)).T
 x_val = rate_data.reshape(((t_steps-wash)*n_sigs, -1)).T

@@ -51,8 +51,11 @@ sigs = [
 n_sigs = len(sigs)
 apert = np.ones(n_sigs) * 10
 
+old_rate_data = np.zeros((n_sigs, t_steps-wash, n_neurons))
 rate_data = np.zeros((n_sigs, t_steps-wash, n_neurons))
+w_targ_data = np.zeros((n_sigs, t_steps-wash, n_neurons))
 pat_data = np.zeros((n_sigs, t_steps-wash))
+
 init_x = np.zeros((n_sigs, n_neurons))
 
 w_rec = gen_w_rec(n_neurons)
@@ -68,10 +71,17 @@ for i_s, sig in enumerate(sigs):
     # get the rate data
     with nengo.Network() as rate_acc:
         in_sig = nengo.Node(sig)
-        sig_reserv = nengo.Ensemble(n_neurons, sig_dims, neuron_type=neuron_type, seed=SEED)
+        w_targ_out = nengo.Node(size_in=n_neurons)
+        sig_reserv = nengo.Ensemble(n_neurons, sig_dims,
+                                    neuron_type=neuron_type, seed=SEED)
 
-        nengo.Connection(sig_reserv.neurons, sig_reserv.neurons, transform=w_rec, synapse=0)
-        nengo.Connection(in_sig, sig_reserv.neurons, synapse=None, transform=w_in)
+        nengo.Connection(in_sig, sig_reserv.neurons,
+                         transform=w_in, synapse=0)
+        nengo.Connection(sig_reserv.neurons, sig_reserv.neurons,
+                         transform=w_rec, synapse=0)
+        nengo.Connection(sig_reserv.neurons, w_targ_out, transform=w_rec, synapse=None)
+
+        p_w_targ = nengo.Probe(w_targ_out, synapse=None)
         p_rate = nengo.Probe(sig_reserv.neurons, synapse=None)
         p_pat = nengo.Probe(in_sig)
 
@@ -79,20 +89,24 @@ for i_s, sig in enumerate(sigs):
         rate_sim.run(t_len*2)
 
     rate_data[i_s] = rate_sim.data[p_rate][t_steps+wash:]
-    init_x[i_s] = rate_sim.data[p_rate][t_steps+wash]
+    old_rate_data[i_s] = rate_sim.data[p_rate][t_steps+wash-1:-1]
+    w_targ_data[i_s] = rate_sim.data[p_w_targ][t_steps+wash:]
     pat_data[i_s] = rate_sim.data[p_pat][t_steps+wash:, sig_dims-1]
 
+    init_x[i_s] = rate_sim.data[p_rate][t_steps+wash]
+
+old_x_val = old_rate_data.reshape(((t_steps-wash)*n_sigs, -1)).T
 x_val = rate_data.reshape(((t_steps-wash)*n_sigs, -1)).T
 sig_val = pat_data.reshape(((t_steps-wash)*n_sigs, -1)).T
+w_targ = w_targ_data.reshape(((t_steps-wash)*n_sigs, -1)).T
+
 w_out = get_w(x_val, sig_val, n_neurons=n_neurons)
 
 # demonstrates how w_out is functional
 #plt.plot(np.dot(rate_data.reshape(((t_steps-wash)*n_sigs, -1)), w_out))
 #plt.show()
 
-x_val_old = x_val[:, 1:]
-w_targ = np.dot(w_in, sig_val[:, 1:]) + np.dot(w_rec, x_val_old)
-opt_w_rec = get_w(x_val_old, w_targ, n_neurons=n_neurons)
+opt_w_rec = get_w(old_x_val, w_targ, n_neurons=n_neurons)
 
 # do SVD on the neuron data to get Conceptors
 # slowest part of the process and appears to only be using one core

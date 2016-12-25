@@ -1,4 +1,4 @@
-from utils import gen_w_rec, get_conceptors_w_solver, get_w
+from utils import gen_w_rec, get_conceptors_w_solver, check_w_out
 from tanh_neuron import TanhWithBias
 
 import nengo
@@ -109,7 +109,7 @@ opt_w_rec = solver(old_x_val.T, w_targ.T)[0]
 
 # do SVD on the neuron data to get Conceptors
 # slowest part of the process and appears to only be using one core
-conceptors = get_conceptors_w_solver(rate_data, sig_val, apert)
+#check_w_out(x_val, w_out, sig_val)
 
 
 def get_idx(t):

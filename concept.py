@@ -1,8 +1,9 @@
-from utils import gen_w_rec, get_conceptors, get_w
+from utils import gen_w_rec, get_conceptors, get_w, check_w_out
 from tanh_neuron import TanhWithBias
 
 import nengo
 import nengo.solvers
+import nengo.utils.numpy as npext
 import nengolib
 
 import numpy as np
@@ -66,6 +67,9 @@ w_in = 2 * (np.random.randn(n_neurons, sig_dims) - 0.5)
 neuron_type = TanhWithBias(seed=SEED)
 #neuron_type = nengo.LIFRate()
 
+def w_targ_func(t, x):
+    return np.dot(x, w_rec)
+
 
 for i_s, sig in enumerate(sigs):
     # get the rate data
@@ -79,9 +83,9 @@ for i_s, sig in enumerate(sigs):
                          transform=w_in, synapse=0)
         nengo.Connection(sig_reserv.neurons, sig_reserv.neurons,
                          transform=w_rec, synapse=0)
-        nengo.Connection(sig_reserv.neurons, w_targ_out, transform=w_rec, synapse=None)
+        nengo.Connection(in_sig, w_targ_out, transform=w_in, synapse=None)
 
-        p_w_targ = nengo.Probe(w_targ_out, synapse=None)
+        p_w_targ = nengo.Probe(w_targ_out, synapse=0)
         p_rate = nengo.Probe(sig_reserv.neurons, synapse=None)
         p_pat = nengo.Probe(in_sig)
 
@@ -103,10 +107,11 @@ w_targ = w_targ_data.reshape(((t_steps-wash)*n_sigs, -1)).T
 w_out = get_w(x_val, sig_val, n_neurons=n_neurons)
 
 # demonstrates how w_out is functional
-#plt.plot(np.dot(rate_data.reshape(((t_steps-wash)*n_sigs, -1)), w_out))
-#plt.show()
+#check_w_out(x_val, w_out, sig_val)
 
+# TODO: THE RMSE OF THIS THING IS LIKE 11?
 opt_w_rec = get_w(old_x_val, w_targ, n_neurons=n_neurons)
+print(npext.rmse(np.dot(opt_w_rec, old_x_val), w_targ))
 
 # do SVD on the neuron data to get Conceptors
 # slowest part of the process and appears to only be using one core

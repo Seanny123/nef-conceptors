@@ -2,6 +2,7 @@ import numpy as np
 import scipy
 import matplotlib.pyplot as plt
 import nengo
+import nengo.utils.numpy as npext
 
 #import ipdb
 
@@ -37,8 +38,11 @@ def gen_w_rec(n_neurons):
 def get_w(rate_data, target, n_neurons=1, reg=0):
     """The solution method from the Matlab implementation"""
     return np.dot(
-        np.dot(np.linalg.pinv(np.dot(rate_data, rate_data.T) + reg * np.eye(n_neurons)), rate_data),
-        target.T)
+             np.dot(
+               np.linalg.pinv(
+                  np.dot(rate_data, rate_data.T) + reg * np.eye(n_neurons)
+               ), rate_data),
+           target.T)
 
 
 def get_conceptors(rate_data, n_sigs, t_steps, apert, n_neurons):
@@ -91,3 +95,11 @@ def get_conceptors_w_solver(rate_data, sig_val, apert):
             )[0]
         )
     return conceptors
+
+def check_w_out(x_val, w_out, sig_val):
+    approx = np.dot(x_val.T, w_out)
+    print(npext.rmse(approx, sig_val.T))
+    
+    plt.plot(approx, alpha=0.5)
+    plt.plot(sig_val.T, alpha=0.5)
+    plt.show()

@@ -30,7 +30,7 @@ TychonovAlpha = 0; % regularizer for  W training
 TychonovAlphaReadout = 0; % regularizer for  Wout training
 
 %%% Conceptor learning and testing
-alphas = 10 * ones(1,nP); % apertures
+alphas = ones(1,nP); % apertures
 CtestLength = 1000;
 
 %%% setting sequence order of patterns to be displayed
@@ -44,10 +44,31 @@ plotPicks = [1 1 1 1 1]; % which input dimensions are plotted
 
 
 %%% Initialise the patterns
-sinPer = (2 * pi * 10) / tMax;
-cosPer = (2 * pi * 20) / tMax;
-p1 = 0.9*sin(tSteps*sinPer)';
-p2 = 0.5*cos(tSteps*cosPer)';
+ff = 50;
+d = fdesign.lowpass('N,Fc', ff, 5, 1/0.001);
+Hd = design(d);
+
+p1 = zeros(tLen, 1);
+
+tmp_count = 1;
+for t = tSteps
+   p1(tmp_count) = triangle(t);
+   tmp_count = tmp_count + 1;
+end
+
+f_p1= filter(Hd,p1);
+p1 = f_p1(ff:end);
+
+p2 = zeros(tLen, 1);
+
+tmp_count = 1;
+for t = tSteps
+   p2(tmp_count) = slow_triangle(t);
+   tmp_count = tmp_count + 1;
+end
+
+f_p2= filter(Hd,p2);
+p2 = f_p2(ff:end);
 
 % pattern durations
 pl1 = size(p1,1); pl2 = size(p2,1);
@@ -226,31 +247,31 @@ end
 
 
 %%% plot some reservoir states obtained during pattern-regeneration
-%if showStates
-%    figure(2); clf;
-%    set(gcf, 'WindowStyle','normal');
-%    set(gcf,'Position', [900 150 500 120]);
-%    for p = 1:nP
-%        subplot(1,nP,p);
-%        plot(x_CTestPLSingle(:,:,p)');
-%        if p == 1
-%            title('some states');
-%        end
-%    end
-%end
+if showStates
+    figure(2); clf;
+    set(gcf, 'WindowStyle','normal');
+    set(gcf,'Position', [900 150 500 120]);
+    for p = 1:nP
+        subplot(1,nP,p);
+        plot(x_CTestPLSingle(:,:,p)');
+        if p == 1
+            title('some states');
+        end
+    end
+end
 
 %%% plot singular value spectra of conceptors
-%if showSingVals
-%    figure(3); clf;
-%    set(gcf, 'WindowStyle','normal');
-%    set(gcf,'Position', [1200 150 500 120]);
-%    for p = 1:nP
-%        subplot(1,nP,p);
-%        Csingvals = sort(Cs{3, p},'descend');
-%        plotLength = min([100,  length(Csingvals) ]);
-%        plot(Csingvals(1:plotLength), 'b');
-%        if p == 1
-%            title('C singvals');
-%        end
-%    end
-%end
+if showSingVals
+    figure(3); clf;
+    set(gcf, 'WindowStyle','normal');
+    set(gcf,'Position', [1200 150 500 120]);
+    for p = 1:nP
+        subplot(1,nP,p);
+        Csingvals = sort(Cs{3, p},'descend');
+        plotLength = min([100,  length(Csingvals) ]);
+        plot(Csingvals(1:plotLength), 'b');
+        if p == 1
+            title('C singvals');
+        end
+    end
+end

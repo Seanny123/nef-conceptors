@@ -39,15 +39,25 @@ pattOrder = [1 2];
 tMax = 0.5;
 tSteps = 0:0.001:tMax;
 tLen = size(tSteps, 2);
-
-plotPicks = [1 1 1 1 1]; % which input dimensions are plotted
+pattDurations = [tLen, tLen];
+%%% setting durations for morphing transitions between two subsequent patterns
+pattTransitions = 100 * ones(1, length(pattOrder)-1);
 
 
 %%% Initialise the patterns
 sinPer = (2 * pi * 10) / tMax;
 cosPer = (2 * pi * 20) / tMax;
-p1 = 0.9*sin(tSteps*sinPer)';
-p2 = 0.5*cos(tSteps*cosPer)';
+p1 = sin(tSteps*sinPer)';
+p2 = zeros(tLen, 1);
+
+tmp_x = 0;
+tmp_count = 1;
+for t = tSteps
+   p2(tmp_count) = so_funky(t);
+   tmp_count = tmp_count + 1;
+end
+
+plot(p2);
 
 % pattern durations
 pl1 = size(p1,1); pl2 = size(p2,1);
@@ -166,7 +176,7 @@ disp(sprintf('mean NRMSE W: %g   mean abs W: %g ', ...
 %%% compute conceptors
 Cs = cell(4, nP);
 for p = 1:nP
-    [U S V] = svd(patternRs{p});
+    [U,S,V] = svd(patternRs{p});
     Snew = (S * pinv(S + alphas(p)^(-2) * eye(Netsize)));
     C = U * Snew * U';
     Cs{1, p} = C;
@@ -175,82 +185,35 @@ for p = 1:nP
     Cs{4, p} = diag(S);    
 end
 
-%save('conc_vals', 'Cs')
-%%% test 
+%%% blending
 
-x_CTestPLSingle = zeros(10, CtestLength, nP);
-p_CTestPLSingle = zeros(pattDim, CtestLength, nP);
+%% create morph sequence data
+% this whole thing is hardcoded for two patterns, because I'm lazy
 
-for p = 1:nP
-    C = Cs{1, p};
-    x = startXs(:,p);
-    %x = startXs(:,p) + randn(size(startXs(:, 1)));
-    %x = tanh(startXs(:,p));
+L = sum(pattDurations) + sum(pattTransitions);
+mus = ones(pattDim,L);
+
+mus(pattDurations(1):pattDurations(1)+pattTransitions(1)) = ...
+    linspace(1,0,pattTransitions(1)+1);
+
+mus(pattDurations(1)+pattTransitions(1):L) = ...
+    zeros(pattDim,pattDurations(2)+1);
+
+p_CTestPLMorph = zeros(pattDim, L);
+x = startXs(:,pattOrder(1));
+for n = 1:L
+    % change the order of this update later
+    xOld = x;
+    x = (1-LR)*xOld + LR * tanh(W *  x + Wbias);
+
+    thismu = mus(:,n);
+    % if this operation takes too long, check if mu == 0
+    thisC = thismu * Cs{1,1} + (1-thismu) * Cs{1,2};
     
-    for n = 1:CtestLength
-        x_rec = x;
-        xOld = C * x_rec;
-        x = (1-LR)*xOld + LR * tanh(W*xOld + Wbias);
-        
-        x_CTestPLSingle(:,n,p) = x(1:10,1);
-        p_CTestPLSingle(:,n,p) = Wout * x; 
-    end
+    x = thisC * x;
+    p_CTestPLMorph(:,n) = Wout * x;
 end
-
-%%% Try blending later
 
 %%% plotting
-
-% the overview on all patterns
-figure(1); clf;
-set(gcf, 'WindowStyle','normal');
-set(gcf,'Position', [800 100 800 800]);
-
-subplotCounter = 0;
-
-for p = 1:nP
-    subplotCounter = subplotCounter + 1;
-    subplot(nP, 1, subplotCounter);
-
-    hold on;
-    % reference
-    plot(1:pattlengths(p) - washoutLength, patts{p}(washoutLength+1:end)', 'b');
-    % conceptor
-    plot(1:CtestLength, p_CTestPLSingle(1,:,p)', 'r');
-    % after initial training
-    %plot(1:size(outsTrain{p},1), outsTrain{p}, 'g');
-    hold off;
-
-    % set(gca, 'YLim', [-1 1]);
-end
-
-
-%%% plot some reservoir states obtained during pattern-regeneration
-%if showStates
-%    figure(2); clf;
-%    set(gcf, 'WindowStyle','normal');
-%    set(gcf,'Position', [900 150 500 120]);
-%    for p = 1:nP
-%        subplot(1,nP,p);
-%        plot(x_CTestPLSingle(:,:,p)');
-%        if p == 1
-%            title('some states');
-%        end
-%    end
-%end
-
-%%% plot singular value spectra of conceptors
-%if showSingVals
-%    figure(3); clf;
-%    set(gcf, 'WindowStyle','normal');
-%    set(gcf,'Position', [1200 150 500 120]);
-%    for p = 1:nP
-%        subplot(1,nP,p);
-%        Csingvals = sort(Cs{3, p},'descend');
-%        plotLength = min([100,  length(Csingvals) ]);
-%        plot(Csingvals(1:plotLength), 'b');
-%        if p == 1
-%            title('C singvals');
-%        end
-%    end
-%end
+% I'm going to want to make these plots much prettier later
+plot(1:L, p_CTestPLMorph', 'r');

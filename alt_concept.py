@@ -3,6 +3,7 @@ from tanh_neuron import TanhWithBias
 
 import nengo
 import nengo.solvers
+import nengo.utils.numpy as npext
 import nengolib
 
 import numpy as np
@@ -58,12 +59,12 @@ pat_data = np.zeros((n_sigs, t_steps-wash))
 
 init_x = np.zeros((n_sigs, n_neurons))
 
+# TODO: just initialise this randomly
 w_rec = gen_w_rec(n_neurons)
 enc_dist = nengo.dists.UniformHypersphere(surface=True)
 encoders = enc_dist.sample(n_neurons, sig_dims)
 
-neuron_type = TanhWithBias(seed=SEED)
-#neuron_type = nengo.LIFRate()
+neuron_type = nengo.LIFRate()
 
 for i_s, sig in enumerate(sigs):
     # get the rate data
@@ -77,6 +78,8 @@ for i_s, sig in enumerate(sigs):
         nengo.Connection(in_sig, sig_reserv, synapse=0)
         nengo.Connection(sig_reserv.neurons, sig_reserv.neurons,
                          transform=w_rec, synapse=0)
+        nengo.Connection(sig_reserv, sig_reserv,
+                         transform=0.6, synapse=0)
         nengo.Connection(sig_reserv.neurons, w_targ_out, transform=w_rec, synapse=None)
 
         p_w_targ = nengo.Probe(w_targ_out, synapse=None)
@@ -106,6 +109,7 @@ w_out = solver(x_val.T, sig_val.T)[0]
 #plt.show()
 
 opt_w_rec = solver(old_x_val.T, w_targ.T)[0]
+print(npext.rmse(np.dot(opt_w_rec, old_x_val), w_targ))
 
 # do SVD on the neuron data to get Conceptors
 # slowest part of the process and appears to only be using one core

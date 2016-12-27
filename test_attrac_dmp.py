@@ -43,4 +43,3 @@ with nengo.Simulator(ad_model) as ad_sim:
 g_dat = ad_sim.data[p_out][int(2*period/dt):]
 plt.plot(d3_scale(g_dat))
 plt.show()
-

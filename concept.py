@@ -111,6 +111,7 @@ w_out = get_w(x_val, sig_val, n_neurons=n_neurons)
 
 # TODO: THE RMSE OF THIS THING IS LIKE 11?
 opt_w_rec = get_w(old_x_val, w_targ, n_neurons=n_neurons)
+ipdb.set_trace()
 print(npext.rmse(np.dot(opt_w_rec, old_x_val), w_targ))
 
 # do SVD on the neuron data to get Conceptors
